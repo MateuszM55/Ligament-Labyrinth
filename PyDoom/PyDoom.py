@@ -15,9 +15,38 @@ class Player:
         self.rotation_speed = 120.0  # degrees per second
         self.mouse_sensitivity = 0.2  # Mouse sensitivity multiplier
         
+        # Collision settings
+        self.collision_radius = 0.  # Radius for collision detection
+        
         # Cache for trigonometric calculations
         self._cos_cache = math.cos(math.radians(rotation))
         self._sin_cache = math.sin(math.radians(rotation))
+    
+    def _check_collision(self, x, y, game_map):
+        """Check if position collides with walls using collision radius"""
+        # Check the center point
+        if game_map.is_wall(x, y):
+            return True
+        
+        # Check points around the player's collision circle
+        # Check 4 cardinal directions at the collision radius
+        offsets = [
+            (self.collision_radius, 0),
+            (-self.collision_radius, 0),
+            (0, self.collision_radius),
+            (0, -self.collision_radius),
+            # Also check diagonal corners for better collision
+            (self.collision_radius * 0.707, self.collision_radius * 0.707),
+            (-self.collision_radius * 0.707, self.collision_radius * 0.707),
+            (self.collision_radius * 0.707, -self.collision_radius * 0.707),
+            (-self.collision_radius * 0.707, -self.collision_radius * 0.707)
+        ]
+        
+        for offset_x, offset_y in offsets:
+            if game_map.is_wall(x + offset_x, y + offset_y):
+                return True
+        
+        return False
         
     def set_position(self, x, y):
         """Set player position"""
@@ -55,7 +84,7 @@ class Player:
         """Move player forward in the direction they're facing"""
         new_x = self.x + self._cos_cache * self.move_speed * dt
         new_y = self.y + self._sin_cache * self.move_speed * dt
-        if not game_map.is_wall(new_x, new_y):
+        if not self._check_collision(new_x, new_y, game_map):
             self.x = new_x
             self.y = new_y
         
@@ -63,7 +92,7 @@ class Player:
         """Move player backward"""
         new_x = self.x - self._cos_cache * self.move_speed * dt
         new_y = self.y - self._sin_cache * self.move_speed * dt
-        if not game_map.is_wall(new_x, new_y):
+        if not self._check_collision(new_x, new_y, game_map):
             self.x = new_x
             self.y = new_y
         
@@ -72,7 +101,7 @@ class Player:
         # Left is 90 degrees counter-clockwise: (cos, sin) -> (sin, -cos)
         new_x = self.x + self._sin_cache * self.move_speed * dt
         new_y = self.y - self._cos_cache * self.move_speed * dt
-        if not game_map.is_wall(new_x, new_y):
+        if not self._check_collision(new_x, new_y, game_map):
             self.x = new_x
             self.y = new_y
         
@@ -81,7 +110,7 @@ class Player:
         # Right is 90 degrees clockwise: (cos, sin) -> (-sin, cos)
         new_x = self.x - self._sin_cache * self.move_speed * dt
         new_y = self.y + self._cos_cache * self.move_speed * dt
-        if not game_map.is_wall(new_x, new_y):
+        if not self._check_collision(new_x, new_y, game_map):
             self.x = new_x
             self.y = new_y
         

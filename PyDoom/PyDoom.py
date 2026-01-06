@@ -1,5 +1,6 @@
 import pygame
 import sys
+import math
 from pygame.locals import *
 
 class Player:
@@ -8,6 +9,10 @@ class Player:
         self.x = float(x)
         self.y = float(y)
         self.rotation = float(rotation)  # Rotation in degrees
+        
+        # Movement settings
+        self.move_speed = 200.0  # pixels per second
+        self.rotation_speed = 120.0  # degrees per second
         
     def set_position(self, x, y):
         """Set player position"""
@@ -28,6 +33,38 @@ class Player:
         self.rotation += float(degrees)
         # Keep rotation in 0-360 range
         self.rotation = self.rotation % 360.0
+        
+    def move_forward(self, dt):
+        """Move player forward in the direction they're facing"""
+        rad = math.radians(self.rotation)
+        self.x += math.cos(rad) * self.move_speed * dt
+        self.y += math.sin(rad) * self.move_speed * dt
+        
+    def move_backward(self, dt):
+        """Move player backward"""
+        rad = math.radians(self.rotation)
+        self.x -= math.cos(rad) * self.move_speed * dt
+        self.y -= math.sin(rad) * self.move_speed * dt
+        
+    def strafe_left(self, dt):
+        """Strafe left (perpendicular to facing direction)"""
+        rad = math.radians(self.rotation - 90)
+        self.x += math.cos(rad) * self.move_speed * dt
+        self.y += math.sin(rad) * self.move_speed * dt
+        
+    def strafe_right(self, dt):
+        """Strafe right (perpendicular to facing direction)"""
+        rad = math.radians(self.rotation + 90)
+        self.x += math.cos(rad) * self.move_speed * dt
+        self.y += math.sin(rad) * self.move_speed * dt
+        
+    def look_left(self, dt):
+        """Rotate player left"""
+        self.rotate(-self.rotation_speed * dt)
+        
+    def look_right(self, dt):
+        """Rotate player right"""
+        self.rotate(self.rotation_speed * dt)
 
 class Game:
     def __init__(self):
@@ -84,11 +121,30 @@ class Game:
         """Handle mouse click events"""
         pass
         
+    def handle_player_input(self, dt):
+        """Handle continuous keyboard input for player movement"""
+        keys = pygame.key.get_pressed()
+        
+        # Movement: WASD
+        if keys[K_w]:
+            self.player.move_forward(dt)
+        if keys[K_s]:
+            self.player.move_backward(dt)
+        if keys[K_a]:
+            self.player.strafe_left(dt)
+        if keys[K_d]:
+            self.player.strafe_right(dt)
+            
+        # Rotation: Arrow keys
+        if keys[K_LEFT]:
+            self.player.look_left(dt)
+        if keys[K_RIGHT]:
+            self.player.look_right(dt)
+        
     def update(self, dt):
         """Update game logic"""
         if not self.paused:
-            # Update game objects here
-            pass
+            self.handle_player_input(dt)
             
     def render(self):
         """Render everything to the screen"""

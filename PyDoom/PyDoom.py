@@ -2,6 +2,33 @@ import pygame
 import sys
 from pygame.locals import *
 
+class Player:
+    def __init__(self, x, y, rotation=0.0):
+        """Initialize player with position and rotation"""
+        self.x = float(x)
+        self.y = float(y)
+        self.rotation = float(rotation)  # Rotation in degrees
+        
+    def set_position(self, x, y):
+        """Set player position"""
+        self.x = float(x)
+        self.y = float(y)
+        
+    def set_rotation(self, rotation):
+        """Set player rotation"""
+        self.rotation = float(rotation)
+        
+    def move(self, dx, dy):
+        """Move player by delta amounts"""
+        self.x += float(dx)
+        self.y += float(dy)
+        
+    def rotate(self, degrees):
+        """Rotate player by degrees"""
+        self.rotation += float(degrees)
+        # Keep rotation in 0-360 range
+        self.rotation = self.rotation % 360.0
+
 class Game:
     def __init__(self):
         pygame.init()
@@ -26,6 +53,9 @@ class Game:
         self.RED = (255, 0, 0)
         self.GREEN = (0, 255, 0)
         self.BLUE = (0, 0, 255)
+        
+        # Initialize player at center of screen
+        self.player = Player(self.screen_width / 2, self.screen_height / 2, 0.0)
         
     def handle_events(self):
         """Handle all pygame events"""

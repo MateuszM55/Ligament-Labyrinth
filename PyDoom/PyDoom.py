@@ -14,6 +14,10 @@ class Player:
         self.move_speed = 3.0  # units per second
         self.rotation_speed = 120.0  # degrees per second
         
+        # Cache for trigonometric calculations
+        self._cos_cache = math.cos(math.radians(rotation))
+        self._sin_cache = math.sin(math.radians(rotation))
+        
     def set_position(self, x, y):
         """Set player position"""
         self.x = float(x)
@@ -22,6 +26,13 @@ class Player:
     def set_rotation(self, rotation):
         """Set player rotation"""
         self.rotation = float(rotation)
+        self._update_trig_cache()
+        
+    def _update_trig_cache(self):
+        """Update cached trigonometric values"""
+        rad = math.radians(self.rotation)
+        self._cos_cache = math.cos(rad)
+        self._sin_cache = math.sin(rad)
         
     def move(self, dx, dy):
         """Move player by delta amounts"""
@@ -33,39 +44,38 @@ class Player:
         self.rotation += float(degrees)
         # Keep rotation in 0-360 range
         self.rotation = self.rotation % 360.0
+        self._update_trig_cache()
         
     def move_forward(self, dt, game_map):
         """Move player forward in the direction they're facing"""
-        rad = math.radians(self.rotation)
-        new_x = self.x + math.cos(rad) * self.move_speed * dt
-        new_y = self.y + math.sin(rad) * self.move_speed * dt
+        new_x = self.x + self._cos_cache * self.move_speed * dt
+        new_y = self.y + self._sin_cache * self.move_speed * dt
         if not game_map.is_wall(new_x, new_y):
             self.x = new_x
             self.y = new_y
         
     def move_backward(self, dt, game_map):
         """Move player backward"""
-        rad = math.radians(self.rotation)
-        new_x = self.x - math.cos(rad) * self.move_speed * dt
-        new_y = self.y - math.sin(rad) * self.move_speed * dt
+        new_x = self.x - self._cos_cache * self.move_speed * dt
+        new_y = self.y - self._sin_cache * self.move_speed * dt
         if not game_map.is_wall(new_x, new_y):
             self.x = new_x
             self.y = new_y
         
     def strafe_left(self, dt, game_map):
         """Strafe left (perpendicular to facing direction)"""
-        rad = math.radians(self.rotation - 90)
-        new_x = self.x + math.cos(rad) * self.move_speed * dt
-        new_y = self.y + math.sin(rad) * self.move_speed * dt
+        # Left is 90 degrees counter-clockwise: (cos, sin) -> (sin, -cos)
+        new_x = self.x + self._sin_cache * self.move_speed * dt
+        new_y = self.y - self._cos_cache * self.move_speed * dt
         if not game_map.is_wall(new_x, new_y):
             self.x = new_x
             self.y = new_y
         
     def strafe_right(self, dt, game_map):
         """Strafe right (perpendicular to facing direction)"""
-        rad = math.radians(self.rotation + 90)
-        new_x = self.x + math.cos(rad) * self.move_speed * dt
-        new_y = self.y + math.sin(rad) * self.move_speed * dt
+        # Right is 90 degrees clockwise: (cos, sin) -> (-sin, cos)
+        new_x = self.x - self._sin_cache * self.move_speed * dt
+        new_y = self.y + self._cos_cache * self.move_speed * dt
         if not game_map.is_wall(new_x, new_y):
             self.x = new_x
             self.y = new_y
@@ -115,34 +125,90 @@ class Raycaster:
         self.fov = 60  # Field of view in degrees
         self.max_depth = 20.0  # Maximum ray distance
         self.num_rays = screen_width  # One ray per column
+        self.wall_buffer = []  # Cache for wall rendering
         
     def cast_ray(self, player, game_map, angle):
-        """Cast a single ray and return distance to wall"""
+        """Cast a single ray using DDA algorithm for better performance"""
         rad = math.radians(angle)
         ray_dx = math.cos(rad)
         ray_dy = math.sin(rad)
         
-        # Start from player position
+        # Player position
         x = player.x
         y = player.y
         
-        # Step along ray until we hit a wall
-        step = 0.01
-        distance = 0.0
+        # Map position
+        map_x = int(x)
+        map_y = int(y)
         
-        while distance < self.max_depth:
-            x += ray_dx * step
-            y += ray_dy * step
-            distance += step
+        # Length of ray from one x or y-side to next x or y-side
+        try:
+            delta_dist_x = abs(1 / ray_dx) if ray_dx != 0 else float('inf')
+            delta_dist_y = abs(1 / ray_dy) if ray_dy != 0 else float('inf')
+        except ZeroDivisionError:
+            delta_dist_x = float('inf')
+            delta_dist_y = float('inf')
+        
+        # Calculate step and initial side_dist
+        if ray_dx < 0:
+            step_x = -1
+            side_dist_x = (x - map_x) * delta_dist_x
+        else:
+            step_x = 1
+            side_dist_x = (map_x + 1.0 - x) * delta_dist_x
             
-            if game_map.is_wall(x, y):
-                return distance
-                
-        return self.max_depth
+        if ray_dy < 0:
+            step_y = -1
+            side_dist_y = (y - map_y) * delta_dist_y
+        else:
+            step_y = 1
+            side_dist_y = (map_y + 1.0 - y) * delta_dist_y
+        
+        # Perform DDA
+        hit = False
+        side = 0  # 0 for x-side, 1 for y-side
+        max_iterations = 50  # Prevent infinite loops
+        iterations = 0
+        
+        while not hit and iterations < max_iterations:
+            # Jump to next map square in x or y direction
+            if side_dist_x < side_dist_y:
+                side_dist_x += delta_dist_x
+                map_x += step_x
+                side = 0
+            else:
+                side_dist_y += delta_dist_y
+                map_y += step_y
+                side = 1
+            
+            iterations += 1
+            
+            # Check if ray has hit a wall
+            if game_map.get_tile(map_x, map_y) == 1:
+                hit = True
+        
+        # Calculate distance
+        if side == 0:
+            distance = (map_x - x + (1 - step_x) / 2) / ray_dx if ray_dx != 0 else self.max_depth
+        else:
+            distance = (map_y - y + (1 - step_y) / 2) / ray_dy if ray_dy != 0 else self.max_depth
+        
+        distance = abs(distance)
+        
+        if distance > self.max_depth or distance < 0:
+            distance = self.max_depth
+            
+        return distance, side
         
     def render_3d_view(self, screen, player, game_map):
-        """Render the 3D view using raycasting"""
+        """Render the 3D view using raycasting with optimizations"""
         half_fov = self.fov / 2.0
+        
+        # Pre-calculate constants
+        screen_half = self.screen_height / 2
+        
+        # Clear wall buffer
+        self.wall_buffer.clear()
         
         for ray_index in range(self.num_rays):
             # Calculate ray angle
@@ -150,39 +216,41 @@ class Raycaster:
             ray_angle = player.rotation + angle_offset
             
             # Cast ray
-            distance = self.cast_ray(player, game_map, ray_angle)
+            distance, side = self.cast_ray(player, game_map, ray_angle)
             
             # Fix fish-eye effect
             distance *= math.cos(math.radians(angle_offset))
             
             # Calculate wall height based on distance
-            if distance == 0:
+            if distance < 0.01:
                 distance = 0.01
                 
             wall_height = (self.screen_height / distance) * 0.5
             
             # Calculate wall top and bottom
-            wall_top = (self.screen_height / 2) - (wall_height / 2)
-            wall_bottom = (self.screen_height / 2) + (wall_height / 2)
+            wall_top = screen_half - (wall_height / 2)
+            wall_bottom = screen_half + (wall_height / 2)
             
-            # Calculate shading based on distance
+            # Calculate shading based on distance and side
             shade = max(0, min(255, 255 - (distance * 12)))
+            if side == 1:
+                shade = int(shade * 0.75)  # Darker for y-side walls
+            
+            self.wall_buffer.append((ray_index, wall_top, wall_bottom, shade))
+        
+        # Batch render using surfaces for better performance
+        # Draw ceiling as single rect
+        pygame.draw.rect(screen, (50, 50, 50), (0, 0, self.screen_width, screen_half))
+        
+        # Draw floor as single rect
+        pygame.draw.rect(screen, (30, 30, 30), (0, screen_half, self.screen_width, screen_half))
+        
+        # Draw walls
+        for ray_index, wall_top, wall_bottom, shade in self.wall_buffer:
             color = (shade, shade, shade)
-            
-            # Draw ceiling
-            pygame.draw.line(screen, (50, 50, 50), 
-                           (ray_index, 0), 
-                           (ray_index, wall_top))
-            
-            # Draw wall
             pygame.draw.line(screen, color, 
                            (ray_index, wall_top), 
                            (ray_index, wall_bottom))
-            
-            # Draw floor
-            pygame.draw.line(screen, (30, 30, 30), 
-                           (ray_index, wall_bottom), 
-                           (ray_index, self.screen_height))
     
     def render_minimap(self, screen, player, game_map):
         """Render a 2D minimap in the corner"""
@@ -216,7 +284,7 @@ class Raycaster:
         pygame.draw.line(screen, (255, 0, 0), 
                         (player_x, player_y), 
                         (end_x, end_y), 2)
-
+        
 
 class Game:
     def __init__(self):
@@ -235,6 +303,9 @@ class Game:
         # Game state
         self.running = True
         self.paused = False
+        
+        # Performance settings
+        self.show_fps = True
         
         # Colors
         self.BLACK = (0, 0, 0)
@@ -263,6 +334,9 @@ class Game:
         # Initialize raycaster
         self.raycaster = Raycaster(self.screen_width, self.screen_height)
         
+        # Font for FPS display
+        self.font = pygame.font.Font(None, 36)
+
     def handle_events(self):
         """Handle all pygame events"""
         for event in pygame.event.get():
@@ -325,6 +399,11 @@ class Game:
         
         # Render minimap
         self.raycaster.render_minimap(self.screen, self.player, self.game_map)
+        
+        # Display FPS
+        if self.show_fps:
+            fps_text = self.font.render(f"FPS: {int(self.clock.get_fps())}", True, self.GREEN)
+            self.screen.blit(fps_text, (10, 10))
         
         # Update display
         pygame.display.flip()

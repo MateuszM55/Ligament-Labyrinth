@@ -8,11 +8,12 @@ class Player:
         """Initialize player with position and rotation"""
         self.x = float(x)
         self.y = float(y)
-        self.rotation = float(rotation)  # Rotation in degrees
+        self.rotation = float(rotation)  # Rotation in degrees (yaw)
         
         # Movement settings
         self.move_speed = 3.0  # units per second
         self.rotation_speed = 120.0  # degrees per second
+        self.mouse_sensitivity = 0.2  # Mouse sensitivity multiplier
         
         # Cache for trigonometric calculations
         self._cos_cache = math.cos(math.radians(rotation))
@@ -45,6 +46,10 @@ class Player:
         # Keep rotation in 0-360 range
         self.rotation = self.rotation % 360.0
         self._update_trig_cache()
+        
+    def rotate_from_mouse(self, dx):
+        """Rotate player based on mouse movement"""
+        self.rotate(dx * self.mouse_sensitivity)
         
     def move_forward(self, dt, game_map):
         """Move player forward in the direction they're facing"""
@@ -307,6 +312,13 @@ class Game:
         # Performance settings
         self.show_fps = True
         
+        # Mouse control settings
+        self.last_mouse_pos = None
+        
+        # Grab mouse input
+        pygame.event.set_grab(True)
+        pygame.mouse.set_visible(False)
+        
         # Colors
         self.BLACK = (0, 0, 0)
         self.WHITE = (255, 255, 255)
@@ -336,6 +348,12 @@ class Game:
         
         # Font for FPS display
         self.font = pygame.font.Font(None, 36)
+        
+        # Center mouse
+        center_x = self.screen_width // 2
+        center_y = self.screen_height // 2
+        pygame.mouse.set_pos(center_x, center_y)
+        self.last_mouse_pos = (center_x, center_y)
 
     def handle_events(self):
         """Handle all pygame events"""
@@ -348,6 +366,8 @@ class Game:
                 self.handle_keyup(event)
             elif event.type == MOUSEBUTTONDOWN:
                 self.handle_mouse_click(event)
+            elif event.type == MOUSEMOTION:
+                self.handle_mouse_motion(event)
                 
     def handle_keydown(self, event):
         """Handle key press events"""
@@ -355,7 +375,14 @@ class Game:
             self.running = False
         elif event.key == K_p:
             self.paused = not self.paused
-            
+            if self.paused:
+                pygame.event.set_grab(False)
+                pygame.mouse.set_visible(True)
+            else:
+                pygame.event.set_grab(True)
+                pygame.mouse.set_visible(False)
+                pygame.mouse.get_rel()  # Clear relative motion
+
     def handle_keyup(self, event):
         """Handle key release events"""
         pass
@@ -364,6 +391,17 @@ class Game:
         """Handle mouse click events"""
         pass
         
+    def handle_mouse_motion(self, event):
+        """Handle mouse motion events"""
+        if not self.paused:
+            # Get mouse movement using relative motion
+            dx, dy = pygame.mouse.get_rel()
+            
+            # Apply mouse movement to player rotation (horizontal only)
+            if dx != 0:
+                self.player.rotate_from_mouse(dx)
+
+
     def handle_player_input(self, dt):
         """Handle continuous keyboard input for player movement"""
         keys = pygame.key.get_pressed()
@@ -383,7 +421,7 @@ class Game:
             self.player.look_left(dt)
         if keys[K_RIGHT]:
             self.player.look_right(dt)
-        
+
     def update(self, dt):
         """Update game logic"""
         if not self.paused:
@@ -427,6 +465,8 @@ class Game:
         
     def quit(self):
         """Clean up and quit"""
+        pygame.event.set_grab(False)
+        pygame.mouse.set_visible(True)
         pygame.quit()
         sys.exit()
 

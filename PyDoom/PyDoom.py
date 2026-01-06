@@ -184,6 +184,38 @@ class Raycaster:
                            (ray_index, wall_bottom), 
                            (ray_index, self.screen_height))
     
+    def render_minimap(self, screen, player, game_map):
+        """Render a 2D minimap in the corner"""
+        minimap_size = 150
+        minimap_scale = minimap_size / max(game_map.width, game_map.height)
+        minimap_x = screen.get_width() - minimap_size - 10
+        minimap_y = 10
+        
+        # Draw minimap background
+        pygame.draw.rect(screen, (0, 0, 0), 
+                        (minimap_x, minimap_y, minimap_size, minimap_size))
+        
+        # Draw map tiles
+        for y in range(game_map.height):
+            for x in range(game_map.width):
+                if game_map.grid[y][x] == 1:
+                    tile_x = minimap_x + x * minimap_scale
+                    tile_y = minimap_y + y * minimap_scale
+                    pygame.draw.rect(screen, (100, 100, 100),
+                                   (tile_x, tile_y, minimap_scale, minimap_scale))
+        
+        # Draw player
+        player_x = minimap_x + player.x * minimap_scale
+        player_y = minimap_y + player.y * minimap_scale
+        pygame.draw.circle(screen, (255, 0, 0), (int(player_x), int(player_y)), 3)
+        
+        # Draw player direction
+        rad = math.radians(player.rotation)
+        end_x = player_x + math.cos(rad) * 10
+        end_y = player_y + math.sin(rad) * 10
+        pygame.draw.line(screen, (255, 0, 0), 
+                        (player_x, player_y), 
+                        (end_x, end_y), 2)
 
 
 class Game:
@@ -291,6 +323,8 @@ class Game:
         # Render 3D view
         self.raycaster.render_3d_view(self.screen, self.player, self.game_map)
         
+        # Render minimap
+        self.raycaster.render_minimap(self.screen, self.player, self.game_map)
         
         # Update display
         pygame.display.flip()

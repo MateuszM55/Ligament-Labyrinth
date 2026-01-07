@@ -17,6 +17,7 @@ class Player:
         
         # Collision settings
         self.collision_radius = 0.1  # Radius for collision detection
+        self.anticipation_frames = 2  # Number of frames to look ahead
         
         # Cache for trigonometric calculations
         self._cos_cache = math.cos(math.radians(rotation))
@@ -47,6 +48,31 @@ class Player:
                 return True
         
         return False
+    
+    def _move_with_collision(self, dx, dy, game_map):
+        """Move with anticipation and wall sliding"""
+        # Calculate anticipated position (look ahead)
+        anticipated_x = self.x + dx * self.anticipation_frames
+        anticipated_y = self.y + dy * self.anticipation_frames
+        
+        # Check if final position will collide
+        new_x = self.x + dx
+        new_y = self.y + dy
+        
+        # Try moving in both X and Y
+        if not self._check_collision(new_x, new_y, game_map):
+            self.x = new_x
+            self.y = new_y
+            return
+        
+        # If diagonal movement failed, try sliding along walls
+        # Try X movement only
+        if not self._check_collision(new_x, self.y, game_map):
+            self.x = new_x
+        
+        # Try Y movement only
+        if not self._check_collision(self.x, new_y, game_map):
+            self.y = new_y
         
     def set_position(self, x, y):
         """Set player position"""
@@ -81,38 +107,30 @@ class Player:
         self.rotate(dx * self.mouse_sensitivity)
         
     def move_forward(self, dt, game_map):
-        """Move player forward in the direction they're facing"""
-        new_x = self.x + self._cos_cache * self.move_speed * dt
-        new_y = self.y + self._sin_cache * self.move_speed * dt
-        if not self._check_collision(new_x, new_y, game_map):
-            self.x = new_x
-            self.y = new_y
+        """Move player forward in the direction they're facing with anticipation"""
+        dx = self._cos_cache * self.move_speed * dt
+        dy = self._sin_cache * self.move_speed * dt
+        self._move_with_collision(dx, dy, game_map)
         
     def move_backward(self, dt, game_map):
-        """Move player backward"""
-        new_x = self.x - self._cos_cache * self.move_speed * dt
-        new_y = self.y - self._sin_cache * self.move_speed * dt
-        if not self._check_collision(new_x, new_y, game_map):
-            self.x = new_x
-            self.y = new_y
+        """Move player backward with anticipation"""
+        dx = -self._cos_cache * self.move_speed * dt
+        dy = -self._sin_cache * self.move_speed * dt
+        self._move_with_collision(dx, dy, game_map)
         
     def strafe_left(self, dt, game_map):
-        """Strafe left (perpendicular to facing direction)"""
+        """Strafe left (perpendicular to facing direction) with anticipation"""
         # Left is 90 degrees counter-clockwise: (cos, sin) -> (sin, -cos)
-        new_x = self.x + self._sin_cache * self.move_speed * dt
-        new_y = self.y - self._cos_cache * self.move_speed * dt
-        if not self._check_collision(new_x, new_y, game_map):
-            self.x = new_x
-            self.y = new_y
+        dx = self._sin_cache * self.move_speed * dt
+        dy = -self._cos_cache * self.move_speed * dt
+        self._move_with_collision(dx, dy, game_map)
         
     def strafe_right(self, dt, game_map):
-        """Strafe right (perpendicular to facing direction)"""
+        """Strafe right (perpendicular to facing direction) with anticipation"""
         # Right is 90 degrees clockwise: (cos, sin) -> (-sin, cos)
-        new_x = self.x - self._sin_cache * self.move_speed * dt
-        new_y = self.y + self._cos_cache * self.move_speed * dt
-        if not self._check_collision(new_x, new_y, game_map):
-            self.x = new_x
-            self.y = new_y
+        dx = -self._sin_cache * self.move_speed * dt
+        dy = self._cos_cache * self.move_speed * dt
+        self._move_with_collision(dx, dy, game_map)
         
     def look_left(self, dt):
         """Rotate player left"""
@@ -158,7 +176,8 @@ class Raycaster:
         self.screen_height = screen_height
         self.fov = 60  # Field of view in degrees
         self.max_depth = 20.0  # Maximum ray distance
-        self.num_rays = screen_width  # One ray per column
+        self.num_rays = screen_width * 1  # Reduced rays for retro look
+        self.ray_width = screen_width // self.num_rays  # Width of each ray column
         self.wall_buffer = []  # Cache for wall rendering
         
         # Load or create textures
@@ -166,7 +185,7 @@ class Raycaster:
         self._init_textures()
         
         # Create a surface for faster blitting
-        self.wall_surface = pygame.Surface((1, screen_height))
+        self.wall_surface = pygame.Surface((self.ray_width, screen_height))
         
     def _init_textures(self):
         """Initialize wall textures"""
@@ -388,10 +407,10 @@ class Raycaster:
                 texture_chunk = texture.subsurface((tex_x, int(src_y), 1, int(src_h)))
                 
                 # 8. Scale ONLY that chunk to fit the screen gap
-                scaled_chunk = pygame.transform.scale(texture_chunk, (1, draw_height))
+                scaled_chunk = pygame.transform.scale(texture_chunk, (self.ray_width, draw_height))
                 
-                # 9. Blit
-                screen.blit(scaled_chunk, (ray_index, draw_start))
+                # 9. Blit at the correct X position (multiply ray_index by ray_width)
+                screen.blit(scaled_chunk, (ray_index * self.ray_width, draw_start))
                 
             except (ValueError, pygame.error):
                 # Fallback if math goes weird (e.g., extremely close walls)

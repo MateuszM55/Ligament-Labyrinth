@@ -16,7 +16,7 @@ class Player:
         self.mouse_sensitivity = 0.2  # Mouse sensitivity multiplier
         
         # Collision settings
-        self.collision_radius = 0.  # Radius for collision detection
+        self.collision_radius = 0.1  # Radius for collision detection
         
         # Cache for trigonometric calculations
         self._cos_cache = math.cos(math.radians(rotation))

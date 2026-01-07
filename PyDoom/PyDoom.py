@@ -260,8 +260,10 @@ class Raycaster:
     def render_3d_view(self, screen, player, game_map):
         """Render the 3D view using raycasting with simple colored walls"""
         
+        aspect_ratio = self.screen_width / self.screen_height
+        # ----------------------------------------
+
         # 1. Pre-calculate the geometry scaling factor
-        # We need the tangent of half the FOV to map screen coordinates to angles
         half_fov_rad = math.radians(self.fov / 2)
         tan_half_fov = math.tan(half_fov_rad)
         
@@ -273,13 +275,11 @@ class Raycaster:
         
         for ray_index in range(self.num_rays):
             # 2. Calculate Screen Coordinate (Normalized from -1 to 1)
-            # This fixes the "0.5" offset issue perfectly.
-            # -1 is the left edge, 0 is center, 1 is right edge.
             screen_x = (2 * ray_index) / self.num_rays - 1
+           
+            # We multiply by aspect_ratio to widen the FOV on wider screens
+            angle_offset_rad = math.atan(screen_x * tan_half_fov * aspect_ratio)
             
-            # 3. Calculate the correct angle offset using ArcTangent
-            # This creates rays that are denser in the center, fixing the wall stretching
-            angle_offset_rad = math.atan(screen_x * tan_half_fov)
             angle_offset_deg = math.degrees(angle_offset_rad)
             
             # Apply to player rotation
@@ -296,7 +296,7 @@ class Raycaster:
             if distance < 0.01:
                 distance = 0.01
                 
-            wall_height = (self.screen_height / distance) * 0.5
+            wall_height = (self.screen_height / distance) * 1
             
             # Calculate wall top and bottom
             wall_top = screen_half - (wall_height / 2)
@@ -366,8 +366,8 @@ class Game:
         pygame.init()
         
         # Display settings
-        self.screen_width = 800
-        self.screen_height = 600
+        self.screen_width = 1600
+        self.screen_height = 900
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("PyDoom")
         

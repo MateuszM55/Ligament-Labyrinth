@@ -180,54 +180,10 @@ class Raycaster:
         self.ray_width = screen_width // self.num_rays  # Width of each ray column
         self.wall_buffer = []  # Cache for wall rendering
         
-        # Load or create textures
-        self.textures = {}
-        self._init_textures()
+        # Simple wall colors
+        self.wall_color_x = (120, 60, 40)  # Color for X-side walls
+        self.wall_color_y = (100, 50, 30)  # Color for Y-side walls (slightly darker)
         
-        # Create a surface for faster blitting
-        self.wall_surface = pygame.Surface((self.ray_width, screen_height))
-        
-    def _init_textures(self):
-        """Initialize wall textures"""
-        # Create a simple brick texture (64x64)
-        texture_size = 64
-        brick_texture = pygame.Surface((texture_size, texture_size))
-        
-        # Draw brick pattern
-        brick_color = (120, 60, 40)
-        mortar_color = (80, 80, 80)
-        brick_texture.fill(brick_color)
-        
-        # Draw horizontal mortar lines
-        for y in range(0, texture_size, 16):
-            pygame.draw.line(brick_texture, mortar_color, (0, y), (texture_size, y), 2)
-        
-        # Draw vertical mortar lines (offset every other row)
-        for y in range(0, texture_size // 16):
-            offset = 8 if y % 2 == 0 else 0
-            for x in range(offset, texture_size, 32):
-                pygame.draw.line(brick_texture, mortar_color, (x, y * 16), (x, (y + 1) * 16), 2)
-        
-        self.textures['wall'] = brick_texture
-        self.texture_width = texture_size
-        self.texture_height = texture_size
-        
-        # Pre-create shaded versions of textures for performance
-        self._create_shaded_textures()
-        
-    def _create_shaded_textures(self):
-        """Create pre-shaded versions of textures"""
-        wall_texture = self.textures['wall']
-        
-        # No shading - all textures at full brightness
-        self.shaded_textures = {}
-        self.shaded_textures_y = {}
-        
-        # Create single brightness level for both X and Y sides
-        for i in range(6):
-            self.shaded_textures[i] = wall_texture.copy()
-            self.shaded_textures_y[i] = wall_texture.copy()
-
     def cast_ray(self, player, game_map, angle):
         """Cast a single ray using DDA algorithm for better performance"""
         rad = math.radians(angle)
@@ -298,23 +254,11 @@ class Raycaster:
         
         if distance > self.max_depth or distance < 0:
             distance = self.max_depth
-        
-        # Calculate wall_x: exact position where ray hit the wall
-        # This is the fractional part of the wall coordinate
-        if side == 0:
-            # X-side hit: use Y coordinate
-            wall_x = y + distance * ray_dy
-        else:
-            # Y-side hit: use X coordinate
-            wall_x = x + distance * ray_dx
-        
-        # Get fractional part (0.0 to 1.0)
-        wall_x = wall_x - math.floor(wall_x)
             
-        return distance, side, wall_x
+        return distance, side
         
     def render_3d_view(self, screen, player, game_map):
-        """Render the 3D view using raycasting with optimized texture mapping"""
+        """Render the 3D view using raycasting with simple colored walls"""
         half_fov = self.fov / 2.0
         
         # Pre-calculate constants
@@ -329,7 +273,7 @@ class Raycaster:
             ray_angle = player.rotation + angle_offset
             
             # Cast ray
-            distance, side, wall_x = self.cast_ray(player, game_map, ray_angle)
+            distance, side = self.cast_ray(player, game_map, ray_angle)
             
             # Fix fish-eye effect
             distance *= math.cos(math.radians(angle_offset))
@@ -344,77 +288,30 @@ class Raycaster:
             wall_top = screen_half - (wall_height / 2)
             wall_bottom = screen_half + (wall_height / 2)
             
-            # Calculate texture X coordinate
-            tex_x = int(wall_x * self.texture_width)
-            if tex_x < 0:
-                tex_x = 0
-            if tex_x >= self.texture_width:
-                tex_x = self.texture_width - 1
-            
-            # No shading - use level 0 (full brightness) for everything
-            shade_level = 0
-            
-            self.wall_buffer.append((ray_index, wall_top, wall_bottom, tex_x, shade_level, side))
+            self.wall_buffer.append((ray_index, wall_top, wall_bottom, side))
         
         # Batch render ceiling and floor
         pygame.draw.rect(screen, (50, 50, 50), (0, 0, self.screen_width, screen_half))
         pygame.draw.rect(screen, (30, 30, 30), (0, screen_half, self.screen_width, screen_half))
         
-        # Draw textured walls using optimized column slicing
-        for ray_index, wall_top, wall_bottom, tex_x, shade_level, side in self.wall_buffer:
+        # Draw simple colored walls
+        for ray_index, wall_top, wall_bottom, side in self.wall_buffer:
             
-            # 1. Calculate the actual pixel range to draw on screen
+            # Calculate the actual pixel range to draw on screen
             draw_start = max(0, int(wall_top))
             draw_end = min(self.screen_height, int(wall_bottom))
             
-            # 2. Calculate height of the drawn segment
             draw_height = draw_end - draw_start
             
             if draw_height <= 0:
                 continue
 
-            # 3. Calculate the "True" height of the wall (even the parts off-screen)
-            full_wall_height = wall_bottom - wall_top
+            # Choose color based on which side of the wall was hit
+            wall_color = self.wall_color_x if side == 0 else self.wall_color_y
             
-            # Prevent division by zero
-            if full_wall_height <= 0:
-                continue
-                
-            # 4. Get the texture (assuming you want the unshaded one for now)
-            texture = self.shaded_textures[0]
-            
-            # 5. Math Magic: Calculate texture coordinates
-            # ratio: How many texture pixels match 1 screen pixel?
-            ratio = self.texture_height / full_wall_height
-            
-            # src_y: Where in the texture do we start? 
-            # If wall_top is negative (off-screen), this skips the top part of the texture
-            src_y = (draw_start - wall_top) * ratio
-            
-            # src_h: How much of the texture height do we need?
-            src_h = draw_height * ratio
-            
-            # 6. Safety Clamping
-            # Floating point errors can make src_y slightly negative or too large
-            if src_y < 0: src_y = 0
-            if src_h <= 0: src_h = 1 # minimal height
-            if src_y + src_h > self.texture_height:
-                src_h = self.texture_height - src_y
-
-            try:
-                # 7. Extract only the needed part of the texture
-                # subsurface((x, y, width, height))
-                texture_chunk = texture.subsurface((tex_x, int(src_y), 1, int(src_h)))
-                
-                # 8. Scale ONLY that chunk to fit the screen gap
-                scaled_chunk = pygame.transform.scale(texture_chunk, (self.ray_width, draw_height))
-                
-                # 9. Blit at the correct X position (multiply ray_index by ray_width)
-                screen.blit(scaled_chunk, (ray_index * self.ray_width, draw_start))
-                
-            except (ValueError, pygame.error):
-                # Fallback if math goes weird (e.g., extremely close walls)
-                pass
+            # Draw the wall column
+            x_pos = ray_index * self.ray_width
+            pygame.draw.rect(screen, wall_color, (x_pos, draw_start, self.ray_width, draw_height))
     
     def render_minimap(self, screen, player, game_map):
         """Render a 2D minimap in the corner"""

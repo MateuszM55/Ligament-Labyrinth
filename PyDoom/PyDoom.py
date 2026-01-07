@@ -343,37 +343,59 @@ class Raycaster:
         
         # Draw textured walls using optimized column slicing
         for ray_index, wall_top, wall_bottom, tex_x, shade_level, side in self.wall_buffer:
-            # Calculate the actual pixel range to draw
+            
+            # 1. Calculate the actual pixel range to draw on screen
             draw_start = max(0, int(wall_top))
-            draw_end = min(self.screen_height - 1, int(wall_bottom))
+            draw_end = min(self.screen_height, int(wall_bottom))
             
-            if draw_end <= draw_start:
+            # 2. Calculate height of the drawn segment
+            draw_height = draw_end - draw_start
+            
+            if draw_height <= 0:
                 continue
+
+            # 3. Calculate the "True" height of the wall (even the parts off-screen)
+            full_wall_height = wall_bottom - wall_top
             
-            # Get the texture (no shading, all same brightness)
+            # Prevent division by zero
+            if full_wall_height <= 0:
+                continue
+                
+            # 4. Get the texture (assuming you want the unshaded one for now)
             texture = self.shaded_textures[0]
             
-            # Extract the vertical slice from texture
-            wall_slice_height = wall_bottom - wall_top
+            # 5. Math Magic: Calculate texture coordinates
+            # ratio: How many texture pixels match 1 screen pixel?
+            ratio = self.texture_height / full_wall_height
             
-            if wall_slice_height <= 0:
-                continue
+            # src_y: Where in the texture do we start? 
+            # If wall_top is negative (off-screen), this skips the top part of the texture
+            src_y = (draw_start - wall_top) * ratio
             
-            # Use subsurface to get texture column
+            # src_h: How much of the texture height do we need?
+            src_h = draw_height * ratio
+            
+            # 6. Safety Clamping
+            # Floating point errors can make src_y slightly negative or too large
+            if src_y < 0: src_y = 0
+            if src_h <= 0: src_h = 1 # minimal height
+            if src_y + src_h > self.texture_height:
+                src_h = self.texture_height - src_y
+
             try:
-                texture_column = texture.subsurface((tex_x, 0, 1, self.texture_height))
+                # 7. Extract only the needed part of the texture
+                # subsurface((x, y, width, height))
+                texture_chunk = texture.subsurface((tex_x, int(src_y), 1, int(src_h)))
                 
-                # Scale the texture column to match wall height
-                scaled_height = draw_end - draw_start
-                if scaled_height > 0:
-                    scaled_column = pygame.transform.scale(texture_column, (1, scaled_height))
-                    
-                    # Blit the scaled column to screen
-                    screen.blit(scaled_column, (ray_index, draw_start))
-            except ValueError:
-                # Fallback to solid color if subsurface fails
-                color = (120, 60, 40)  # Full brightness brick color
-                pygame.draw.line(screen, color, (ray_index, draw_start), (ray_index, draw_end))
+                # 8. Scale ONLY that chunk to fit the screen gap
+                scaled_chunk = pygame.transform.scale(texture_chunk, (1, draw_height))
+                
+                # 9. Blit
+                screen.blit(scaled_chunk, (ray_index, draw_start))
+                
+            except (ValueError, pygame.error):
+                # Fallback if math goes weird (e.g., extremely close walls)
+                pass
     
     def render_minimap(self, screen, player, game_map):
         """Render a 2D minimap in the corner"""

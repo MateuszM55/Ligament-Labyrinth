@@ -19,6 +19,18 @@ class Player:
         self.collision_radius = 0.1  # Radius for collision detection
         self.anticipation_frames = 2  # Number of frames to look ahead
         
+        # Pre-calculate collision offsets
+        self.collision_offsets = [
+            (self.collision_radius, 0),
+            (-self.collision_radius, 0),
+            (0, self.collision_radius),
+            (0, -self.collision_radius),
+            (self.collision_radius * 0.707, self.collision_radius * 0.707),
+            (-self.collision_radius * 0.707, self.collision_radius * 0.707),
+            (self.collision_radius * 0.707, -self.collision_radius * 0.707),
+            (-self.collision_radius * 0.707, -self.collision_radius * 0.707)
+        ]
+        
         # Cache for trigonometric calculations
         self._cos_cache = math.cos(math.radians(rotation))
         self._sin_cache = math.sin(math.radians(rotation))
@@ -29,21 +41,8 @@ class Player:
         if game_map.is_wall(x, y):
             return True
         
-        # Check points around the player's collision circle
-        # Check 4 cardinal directions at the collision radius
-        offsets = [
-            (self.collision_radius, 0),
-            (-self.collision_radius, 0),
-            (0, self.collision_radius),
-            (0, -self.collision_radius),
-            # Also check diagonal corners for better collision
-            (self.collision_radius * 0.707, self.collision_radius * 0.707),
-            (-self.collision_radius * 0.707, self.collision_radius * 0.707),
-            (self.collision_radius * 0.707, -self.collision_radius * 0.707),
-            (-self.collision_radius * 0.707, -self.collision_radius * 0.707)
-        ]
-        
-        for offset_x, offset_y in offsets:
+        # Use the pre-calculated list
+        for offset_x, offset_y in self.collision_offsets:
             if game_map.is_wall(x + offset_x, y + offset_y):
                 return True
         

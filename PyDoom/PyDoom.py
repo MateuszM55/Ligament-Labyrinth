@@ -54,7 +54,7 @@ class Player:
         # Calculate anticipated position (look ahead)
         anticipated_x = self.x + dx * self.anticipation_frames
         anticipated_y = self.y + dy * self.anticipation_frames
-        
+    
         # Check if final position will collide
         new_x = self.x + dx
         new_y = self.y + dy
@@ -64,12 +64,12 @@ class Player:
             self.x = new_x
             self.y = new_y
             return
-        
+
         # If diagonal movement failed, try sliding along walls
         # Try X movement only
         if not self._check_collision(new_x, self.y, game_map):
             self.x = new_x
-        
+
         # Try Y movement only
         if not self._check_collision(self.x, new_y, game_map):
             self.y = new_y
@@ -261,7 +261,6 @@ class Raycaster:
         """Render the 3D view using raycasting with simple colored walls"""
         
         aspect_ratio = self.screen_width / self.screen_height
-        # ----------------------------------------
 
         # 1. Pre-calculate the geometry scaling factor
         half_fov_rad = math.radians(self.fov / 2)
@@ -516,17 +515,49 @@ class Game:
         """Handle continuous keyboard input for player movement"""
         keys = pygame.key.get_pressed()
         
-        # Movement: WASD
+        # Initialize total movement vector
+        total_dx = 0.0
+        total_dy = 0.0
+        
+        move_speed = self.player.move_speed * dt
+        
+        # 1. Accumulate movement vectors based on keys
+        # Forward (W)
         if keys[K_w]:
-            self.player.move_forward(dt, self.game_map)
-        if keys[K_s]:
-            self.player.move_backward(dt, self.game_map)
-        if keys[K_a]:
-            self.player.strafe_left(dt, self.game_map)
-        if keys[K_d]:
-            self.player.strafe_right(dt, self.game_map)
+            total_dx += self.player._cos_cache * move_speed
+            total_dy += self.player._sin_cache * move_speed
             
-        # Rotation: Arrow keys
+        # Backward (S)
+        if keys[K_s]:
+            total_dx += -self.player._cos_cache * move_speed
+            total_dy += -self.player._sin_cache * move_speed
+            
+        # Strafe Left (A)
+        if keys[K_a]:
+            total_dx += self.player._sin_cache * move_speed
+            total_dy += -self.player._cos_cache * move_speed
+            
+        # Strafe Right (D)
+        if keys[K_d]:
+            total_dx += -self.player._sin_cache * move_speed
+            total_dy += self.player._cos_cache * move_speed
+
+        # 2. Normalize vector 
+        # Without this, moving diagonally (W+D) makes you move ~1.4x faster
+        if keys[K_w] or keys[K_s] or keys[K_a] or keys[K_d]:
+            # If we are moving diagonally (non-zero in both axes relative to player), 
+            # the magnitude will be greater than move_speed
+            current_speed = math.sqrt(total_dx**2 + total_dy**2)
+            if current_speed > move_speed:
+                scale = move_speed / current_speed
+                total_dx *= scale
+                total_dy *= scale
+
+        # 3. Apply ONE physics update with the combined vector
+        if total_dx != 0 or total_dy != 0:
+            self.player._move_with_collision(total_dx, total_dy, self.game_map)
+            
+        # Rotation: Arrow keys (This is fine to keep separate as it doesn't affect X/Y collision)
         if keys[K_LEFT]:
             self.player.look_left(dt)
         if keys[K_RIGHT]:

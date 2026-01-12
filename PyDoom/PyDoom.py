@@ -589,12 +589,24 @@ class Raycaster:
             if wall_height > 0 and wall_height < 8000:
                 scaled_strip = pygame.transform.scale(tex_strip, (render_width, wall_height))
                 
-                # Darken the Y-sides for simple lighting effect
-                if side == 1:
-                    darken_surf = pygame.Surface((render_width, wall_height))
-                    darken_surf.set_alpha(80)
-                    darken_surf.fill((0,0,0))
-                    scaled_strip.blit(darken_surf, (0,0))
+                # --- DEPTH SHADING (FOG) ---
+                # Calculate fog intensity based on distance (0.0 = clear, 1.0 = fully black)
+                fog_intensity = min(1.0, distance / 10.0)
+                
+                # Base fog alpha (matches floor fog calculation: 1.0 - fog_factor * 0.6)
+                base_fog_alpha = int(fog_intensity * 0.6 * 255)
+                
+                # Side shading alpha (darken Y-sides)
+                side_alpha = 80 if side == 1 else 0
+                
+                # Combine fog and side shading (additive, capped at 255)
+                total_alpha = min(255, base_fog_alpha + side_alpha)
+                
+                if total_alpha > 0:
+                    fog_surface = pygame.Surface((render_width, wall_height))
+                    fog_surface.set_alpha(total_alpha)
+                    fog_surface.fill((0, 0, 0))
+                    scaled_strip.blit(fog_surface, (0, 0))
 
                 screen.blit(scaled_strip, (ray_index * self.ray_width, wall_top))
 

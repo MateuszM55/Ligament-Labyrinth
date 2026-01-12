@@ -1,6 +1,8 @@
 import pygame
 import sys
 import math
+import os
+import re
 from pygame.locals import *
 
 class Player:
@@ -208,7 +210,7 @@ class Raycaster:
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.fov = 60  # Field of view in degrees
-        self.max_depth = 20.0  # Maximum ray distance
+        self.max_depth = 100.0  # Maximum ray distance
         
         # PERFORMANCE SETTING:
         # Texture mapping in Python is slow. We reduce resolution to keep FPS high.
@@ -220,34 +222,46 @@ class Raycaster:
         
         # Initialize Textures
         self.textures = {}
-        # Define texture mapping (ID -> filename)
-        texture_files = {
-            1: "Asset 1.png",
-            2: "Asset 2.png",
-            3: "Asset 3.png"
-        }
+        texture_dir = "textures"
         
-        # Colors for generated textures if files are missing
+        # Load textures from directory
+        if os.path.exists(texture_dir):
+            for filename in os.listdir(texture_dir):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
+                    # Extract ID from filename (e.g. "Asset 1.png" -> 1, "wall2.png" -> 2)
+                    match = re.search(r'(\d+)', filename)
+                    if match:
+                        try:
+                            tex_id = int(match.group(1))
+                            full_path = os.path.join(texture_dir, filename)
+                            self.textures[tex_id] = pygame.image.load(full_path).convert()
+                            print(f"Loaded texture {tex_id} from {filename}")
+                        except pygame.error:
+                            print(f"Failed to load texture: {filename}")
+                            
+        # Fallback: Generate textures if they weren't loaded from files
+        # This ensures the game runs even if the texture folder is empty or files are missing
         texture_colors = {
             1: ((150, 150, 150), (100, 100, 100)),
             2: ((150, 100, 100), (100, 50, 50)),   # Red tint
             3: ((100, 150, 100), (50, 100, 50))    # Green tint
         }
-
-        # Load or generate textures
+        
+        # Ensure at least IDs 1-3 exist (used in map)
         for i in range(1, 4):
-            filename = texture_files.get(i)
-            try:
-                # Try to load image as requested
-                self.textures[i] = pygame.image.load(filename).convert()
-            except (pygame.error, FileNotFoundError):
-                # Fallback to generated texture
+            if i not in self.textures:
                 c1, c2 = texture_colors.get(i, ((150, 150, 150), (100, 100, 100)))
                 self.textures[i] = generate_texture(64, c1, c2)
                 
         # Default texture properties (assuming all textures share same size for simplicity)
-        self.tex_width = self.textures[1].get_width()
-        self.tex_height = self.textures[1].get_height()
+        # We use texture 1 as the reference for dimensions
+        if 1 in self.textures:
+            self.tex_width = self.textures[1].get_width()
+            self.tex_height = self.textures[1].get_height()
+        else:
+            # Fallback if somehow texture 1 is still missing (shouldn't happen with fallback code above)
+            self.tex_width = 64
+            self.tex_height = 64
         
     def cast_ray(self, player, game_map, angle):
         """Cast a single ray using DDA algorithm"""

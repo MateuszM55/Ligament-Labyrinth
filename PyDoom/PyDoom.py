@@ -16,7 +16,7 @@ class Player:
         self.mouse_sensitivity = 0.2  # Mouse sensitivity multiplier
         
         # Collision settings
-        self.collision_radius = 0.1  # Radius for collision detection
+        self.collision_radius = 0.2  # Radius for collision detection
         self.anticipation_frames = 2  # Number of frames to look ahead
         
         # Pre-calculate collision offsets

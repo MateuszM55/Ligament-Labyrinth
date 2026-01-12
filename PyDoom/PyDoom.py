@@ -247,7 +247,7 @@ class Raycaster:
         
         # Floor/Ceiling resolution scale factor
         # Higher = more pixelated but much faster (4 = 1/16th the pixels, 93% less work)
-        self.floor_scale = 4
+        self.floor_scale = 3
         self.floor_width = screen_width // self.floor_scale
         self.floor_height = screen_height // self.floor_scale
         
@@ -405,9 +405,9 @@ class Raycaster:
         return distance, side, ray_dx, ray_dy, hit_val
         
     def render_floor_ceiling_vectorized(self, screen, player, game_map):
-        """Render floor and ceiling using full NumPy vectorization (no Python loops)"""
+        """Render BOTH floor and ceiling to a single surface (Fixes blue overlap)"""
         
-        # Pre-calculate geometry with view bobbing
+        # Pre-calculate geometry
         half_fov_rad = math.radians(self.fov / 2)
         tan_half_fov = math.tan(half_fov_rad)
         screen_half = self.screen_height / 2 + player.bob_offset_y
@@ -422,118 +422,93 @@ class Raycaster:
         player_cos = math.cos(math.radians(player.rotation))
         player_sin = math.sin(math.radians(player.rotation))
         
-        # Calculate camera plane perpendicular to view direction
+        # Calculate camera plane
         plane_x = -player_sin * tan_half_fov
         plane_y = player_cos * tan_half_fov
         
-        # Create LOW-RESOLUTION surfaces for floor and ceiling
-        floor_surf = pygame.Surface((self.floor_width, self.floor_height))
-        ceiling_surf = pygame.Surface((self.floor_width, self.floor_height))
+        # --- OPTIMIZATION: Use ONE surface for both ---
+        buffer_surf = pygame.Surface((self.floor_width, self.floor_height))
         
-        # Get pixel arrays for direct manipulation
-        floor_pixels = pygame.surfarray.pixels3d(floor_surf)
-        ceiling_pixels = pygame.surfarray.pixels3d(ceiling_surf)
+        # Get pixel array
+        buffer_pixels = pygame.surfarray.pixels3d(buffer_surf)
         
-        # --- NUMPY VECTORIZATION: Process ALL pixels at once ---
-        
-        # Create coordinate grids for all pixels
-        # x_coords: [0, 1, 2, ..., floor_width-1] repeated for each row
-        # y_coords: [0, 1, 2, ..., floor_height-1] repeated for each column
+        # Coordinate Grids
         x_coords, y_coords = np.meshgrid(
             np.arange(self.floor_width, dtype=np.float32),
             np.arange(self.floor_height, dtype=np.float32),
             indexing='xy'
         )
         
-        # Convert low-res coordinates to full-screen coordinates
+        # Calculate row distances
         screen_y_coords = y_coords * self.floor_scale
-        
-        # Calculate distance from horizon for each row
         p = screen_y_coords - screen_half
         
-        # Avoid division by zero at horizon
-        # Replace values near zero with a small number
+        # Avoid division by zero/horizon glitches
         p = np.where(np.abs(p) < 1.0, np.sign(p) * 1.0, p)
         
-        # Calculate row distance for all pixels at once
+        # Calculate real world distance
         pos_z = 0.5 * self.screen_height
         row_distance = pos_z / np.abs(p)
         
-        # Calculate ray direction for each column
-        # Normalized screen x: from -1 (left) to +1 (right)
+        # Ray direction calculation
         screen_x_norm = (2.0 * x_coords / self.floor_width) - 1.0
-        
-        # Ray directions for each column
         ray_dir_x = player_cos + plane_x * screen_x_norm
         ray_dir_y = player_sin + plane_y * screen_x_norm
         
-        # Calculate world coordinates for all pixels
+        # World coordinates
         world_x = player.x + ray_dir_x * row_distance
         world_y = player.y + ray_dir_y * row_distance
         
-        # Convert world coordinates to texture coordinates
-        # Use modulo for tiling
-        tex_x_floor = (world_x * floor_tex_width).astype(np.int32) % floor_tex_width
-        tex_y_floor = (world_y * floor_tex_height).astype(np.int32) % floor_tex_height
-        
-        tex_x_ceiling = (world_x * ceiling_tex_width).astype(np.int32) % ceiling_tex_width
-        tex_y_ceiling = (world_y * ceiling_tex_height).astype(np.int32) % ceiling_tex_height
-        
-        # Calculate fog factor for all pixels
+        # Fog Calculation
         fog_factor = np.clip(row_distance / 10.0, 0.0, 1.0)
         floor_fog = 1.0 - fog_factor * 0.6
         ceiling_fog = 1.0 - fog_factor * 0.7
         
-        # Create masks for floor and ceiling
-        floor_mask = p > 0  # Below horizon
-        ceiling_mask = p < 0  # Above horizon
+        # --- MASKS ---
+        # p > 0 is floor (bottom of screen), p < 0 is ceiling (top of screen)
+        floor_mask = p > 0
+        ceiling_mask = p < 0
         
-        # --- ADVANCED INDEXING: Assign all pixels at once ---
-        
-        # Floor rendering (vectorized)
+        # --- FLOOR RENDERING ---
         if np.any(floor_mask):
-            # Extract texture colors for all floor pixels using advanced indexing
-            floor_colors = self.floor_array[tex_x_floor[floor_mask], tex_y_floor[floor_mask]]
+            tex_x = (world_x * floor_tex_width).astype(np.int32) % floor_tex_width
+            tex_y = (world_y * floor_tex_height).astype(np.int32) % floor_tex_height
             
-            # Apply fog to all colors at once
-            floor_fog_values = floor_fog[floor_mask]
-            floor_colors_fogged = (floor_colors * floor_fog_values[:, np.newaxis]).astype(np.uint8)
+            # Extract colors
+            colors = self.floor_array[tex_x[floor_mask], tex_y[floor_mask]]
             
-            # Get coordinates where we need to write
-            x_floor = x_coords[floor_mask].astype(np.int32)
-            y_floor = y_coords[floor_mask].astype(np.int32)
+            # Apply Fog
+            fog_values = floor_fog[floor_mask]
+            colors_fogged = (colors * fog_values[:, np.newaxis]).astype(np.uint8)
             
-            # Assign all floor pixels at once
-            floor_pixels[x_floor, y_floor] = floor_colors_fogged
-        
-        # Ceiling rendering (vectorized)
+            # Write to buffer
+            x_indices = x_coords[floor_mask].astype(np.int32)
+            y_indices = y_coords[floor_mask].astype(np.int32)
+            buffer_pixels[x_indices, y_indices] = colors_fogged
+
+        # --- CEILING RENDERING ---
         if np.any(ceiling_mask):
-            # Extract texture colors for all ceiling pixels using advanced indexing
-            ceiling_colors = self.ceiling_array[tex_x_ceiling[ceiling_mask], tex_y_ceiling[ceiling_mask]]
+            tex_x = (world_x * ceiling_tex_width).astype(np.int32) % ceiling_tex_width
+            tex_y = (world_y * ceiling_tex_height).astype(np.int32) % ceiling_tex_height
             
-            # Apply fog to all colors at once
-            ceiling_fog_values = ceiling_fog[ceiling_mask]
-            ceiling_colors_fogged = (ceiling_colors * ceiling_fog_values[:, np.newaxis]).astype(np.uint8)
+            # Extract colors
+            colors = self.ceiling_array[tex_x[ceiling_mask], tex_y[ceiling_mask]]
             
-            # Get coordinates where we need to write
-            x_ceiling = x_coords[ceiling_mask].astype(np.int32)
-            y_ceiling = y_coords[ceiling_mask].astype(np.int32)
+            # Apply Fog
+            fog_values = ceiling_fog[ceiling_mask]
+            colors_fogged = (colors * fog_values[:, np.newaxis]).astype(np.uint8)
             
-            # Assign all ceiling pixels at once
-            ceiling_pixels[x_ceiling, y_ceiling] = ceiling_colors_fogged
+            # Write to buffer (Using same buffer!)
+            x_indices = x_coords[ceiling_mask].astype(np.int32)
+            y_indices = y_coords[ceiling_mask].astype(np.int32)
+            buffer_pixels[x_indices, y_indices] = colors_fogged
+
+        # Unlock the surface
+        del buffer_pixels
         
-        # Release pixel arrays
-        del floor_pixels
-        del ceiling_pixels
-        
-        # Scale up the low-res surfaces to full screen size
-        floor_surf_scaled = pygame.transform.scale(floor_surf, (self.screen_width, self.screen_height))
-        ceiling_surf_scaled = pygame.transform.scale(ceiling_surf, (self.screen_width, self.screen_height))
-        
-        # Blit scaled floor and ceiling to screen
-        screen.blit(floor_surf_scaled, (0, 0))
-        screen.blit(ceiling_surf_scaled, (0, 0))
-    
+        # Scale and Blit ONCE
+        scaled_surf = pygame.transform.scale(buffer_surf, (self.screen_width, self.screen_height))
+        screen.blit(scaled_surf, (0, 0))
     def render_3d_view(self, screen, player, game_map):
         """Render the 3D view using raycasting with textures"""
         

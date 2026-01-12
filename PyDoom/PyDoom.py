@@ -169,22 +169,38 @@ class Map:
         return self.grid[map_y][map_x]
 
 
+def generate_texture(size=64, color1=(150, 150, 150), color2=(100, 100, 100)):
+    """Generates a simple checkerboard texture surface"""
+    surface = pygame.Surface((size, size))
+    surface.fill(color1)
+    # Draw a checker pattern
+    pygame.draw.rect(surface, color2, (0, 0, size//2, size//2))
+    pygame.draw.rect(surface, color2, (size//2, size//2, size//2, size//2))
+    return surface
+
 class Raycaster:
     def __init__(self, screen_width, screen_height):
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.fov = 60  # Field of view in degrees
         self.max_depth = 20.0  # Maximum ray distance
-        self.num_rays = screen_width * 1  # Reduced rays for retro look
-        self.ray_width = screen_width // self.num_rays  # Width of each ray column
+        
+        # PERFORMANCE SETTING:
+        # Texture mapping in Python is slow. We reduce resolution to keep FPS high.
+        # // 2 means half resolution (e.g., 800 rays for 1600px screen).
+        self.num_rays = screen_width // 2
+        self.ray_width = self.screen_width / self.num_rays
+        
         self.wall_buffer = []  # Cache for wall rendering
         
-        # Simple wall colors
-        self.wall_color_x = (120, 60, 40)  # Color for X-side walls
-        self.wall_color_y = (100, 50, 30)  # Color for Y-side walls (slightly darker)
+        # Initialize Texture
+        # In the future, use: self.wall_texture = pygame.image.load("wall.png").convert()
+        self.wall_texture = generate_texture(64, (120, 120, 120), (80, 80, 80))
+        self.tex_width = self.wall_texture.get_width()
+        self.tex_height = self.wall_texture.get_height()
         
     def cast_ray(self, player, game_map, angle):
-        """Cast a single ray using DDA algorithm for better performance"""
+        """Cast a single ray using DDA algorithm"""
         rad = math.radians(angle)
         ray_dx = math.cos(rad)
         ray_dy = math.sin(rad)
@@ -223,7 +239,7 @@ class Raycaster:
         # Perform DDA
         hit = False
         side = 0  # 0 for x-side, 1 for y-side
-        max_iterations = 50  # Prevent infinite loops
+        max_iterations = 50
         iterations = 0
         
         while not hit and iterations < max_iterations:
@@ -254,77 +270,85 @@ class Raycaster:
         if distance > self.max_depth or distance < 0:
             distance = self.max_depth
             
-        return distance, side
+        return distance, side, ray_dx, ray_dy
         
     def render_3d_view(self, screen, player, game_map):
-        """Render the 3D view using raycasting with simple colored walls"""
+        """Render the 3D view using raycasting with textures"""
         
         aspect_ratio = self.screen_width / self.screen_height
 
-        # 1. Pre-calculate the geometry scaling factor
+        # Pre-calculate geometry
         half_fov_rad = math.radians(self.fov / 2)
         tan_half_fov = math.tan(half_fov_rad)
-        
-        # Pre-calculate constants
         screen_half = self.screen_height / 2
-        
-        # Clear wall buffer
-        self.wall_buffer.clear()
-        
-        for ray_index in range(self.num_rays):
-            # 2. Calculate Screen Coordinate (Normalized from -1 to 1)
-            screen_x = (2 * ray_index) / self.num_rays - 1
-           
-            # We multiply by aspect_ratio to widen the FOV on wider screens
-            angle_offset_rad = math.atan(screen_x * tan_half_fov * aspect_ratio)
-            
-            angle_offset_deg = math.degrees(angle_offset_rad)
-            
-            # Apply to player rotation
-            ray_angle = player.rotation + angle_offset_deg
-            
-            # Cast ray
-            distance, side = self.cast_ray(player, game_map, ray_angle)
-            
-            # Fix fish-eye effect
-            # We can use the radian offset we just calculated directly
-            distance *= math.cos(angle_offset_rad)
-            
-            # Calculate wall height based on distance
-            if distance < 0.01:
-                distance = 0.01
-                
-            wall_height = (self.screen_height / distance) * 1
-            
-            # Calculate wall top and bottom
-            wall_top = screen_half - (wall_height / 2)
-            wall_bottom = screen_half + (wall_height / 2)
-            
-            self.wall_buffer.append((ray_index, wall_top, wall_bottom, side))
         
         # Batch render ceiling and floor
         pygame.draw.rect(screen, (50, 50, 50), (0, 0, self.screen_width, screen_half))
         pygame.draw.rect(screen, (30, 30, 30), (0, screen_half, self.screen_width, screen_half))
         
-        # Draw simple colored walls
-        for ray_index, wall_top, wall_bottom, side in self.wall_buffer:
+        for ray_index in range(self.num_rays):
+            # Calculate Screen Coordinate
+            screen_x = (2 * ray_index) / self.num_rays - 1
             
-            # Calculate the actual pixel range to draw on screen
-            draw_start = max(0, int(wall_top))
-            draw_end = min(self.screen_height, int(wall_bottom))
+            angle_offset_rad = math.atan(screen_x * tan_half_fov * aspect_ratio)
+            angle_offset_deg = math.degrees(angle_offset_rad)
             
-            draw_height = draw_end - draw_start
+            # Apply to player rotation
+            ray_angle = player.rotation + angle_offset_deg
             
-            if draw_height <= 0:
-                continue
+            # Cast ray - getting distance AND vectors
+            distance, side, ray_dx, ray_dy = self.cast_ray(player, game_map, ray_angle)
+            
+            # Fix fish-eye effect
+            distance *= math.cos(angle_offset_rad)
+            
+            if distance < 0.01:
+                distance = 0.01
+                
+            # Calculate wall height
+            wall_height = int(self.screen_height / distance)
+            wall_top = int(screen_half - (wall_height / 2))
+            
+            # --- TEXTURE CALCULATION ---
+            
+            # 1. Calculate exactly where the wall was hit
+            if side == 0:
+                wall_x = player.y + distance * ray_dy
+            else:
+                wall_x = player.x + distance * ray_dx
+            
+            wall_x -= math.floor(wall_x)
+            
+            # 2. X coordinate on the texture
+            tex_x = int(wall_x * self.tex_width)
+            
+            # 3. Prevent texture mirroring
+            if side == 0 and ray_dx > 0:
+                tex_x = self.tex_width - tex_x - 1
+            if side == 1 and ray_dy < 0:
+                tex_x = self.tex_width - tex_x - 1
+                
+            # 4. Create the vertical strip
+            # We use a subsurface: (x, y, width, height)
+            tex_strip = self.wall_texture.subsurface((tex_x, 0, 1, self.tex_height))
+            
+            # 5. Scale it to the height of the wall on screen
+            # We add 1 to width to prevent gap artifacts
+            render_width = int(self.ray_width) + 1 
+            
+            # Optimization: Don't draw if invisible or crazy huge
+            if wall_height > 0 and wall_height < 8000:
+                scaled_strip = pygame.transform.scale(tex_strip, (render_width, wall_height))
+                
+                # 6. Darken the Y-sides for simple lighting effect
+                if side == 1:
+                    darken_surf = pygame.Surface((render_width, wall_height))
+                    darken_surf.set_alpha(80) # 0-255 transparency
+                    darken_surf.fill((0,0,0))
+                    scaled_strip.blit(darken_surf, (0,0))
 
-            # Choose color based on which side of the wall was hit
-            wall_color = self.wall_color_x if side == 0 else self.wall_color_y
-            
-            # Draw the wall column
-            x_pos = ray_index * self.ray_width
-            pygame.draw.rect(screen, wall_color, (x_pos, draw_start, self.ray_width, draw_height))
-    
+                screen.blit(scaled_strip, (ray_index * self.ray_width, wall_top))
+
     def render_minimap(self, screen, player, game_map):
         """Render a 2D minimap in the corner"""
         minimap_size = 150

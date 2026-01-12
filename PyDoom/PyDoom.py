@@ -7,11 +7,12 @@ import numpy as np
 from pygame.locals import *
 
 class Player:
+    """Represents the player with position, rotation, and movement capabilities"""
+    
     def __init__(self, x, y, rotation=0.0):
-        """Initialize player with position and rotation"""
         self.x = float(x)
         self.y = float(y)
-        self.rotation = float(rotation)  # Rotation in degrees (yaw)
+        self.rotation = float(rotation)
         
         # Movement settings
         self.move_speed = 3.0  # units per second
@@ -46,7 +47,7 @@ class Player:
         self._sin_cache = math.sin(math.radians(rotation))
     
     def _check_collision(self, x, y, game_map):
-        """Check if position collides with walls using collision radius"""
+        """Check if position collides with walls using multiple points around player radius"""
         # Check the center point
         if game_map.is_wall(x, y):
             return True
@@ -59,7 +60,7 @@ class Player:
         return False
     
     def _move_with_collision(self, dx, dy, game_map):
-        """Move with anticipation and wall sliding"""
+        """Move player with collision detection and wall sliding"""
         # Calculate anticipated position (look ahead)
         anticipated_x = self.x + dx * self.anticipation_frames
         anticipated_y = self.y + dy * self.anticipation_frames
@@ -94,7 +95,7 @@ class Player:
         self._update_trig_cache()
         
     def _update_trig_cache(self):
-        """Update cached trigonometric values"""
+        """Cache trigonometric calculations for performance"""
         rad = math.radians(self.rotation)
         self._cos_cache = math.cos(rad)
         self._sin_cache = math.sin(rad)
@@ -106,9 +107,7 @@ class Player:
         
     def rotate(self, degrees):
         """Rotate player by degrees"""
-        self.rotation += float(degrees)
-        # Keep rotation in 0-360 range
-        self.rotation = self.rotation % 360.0
+        self.rotation = (self.rotation + float(degrees)) % 360.0
         self._update_trig_cache()
         
     def rotate_from_mouse(self, dx):
@@ -150,7 +149,7 @@ class Player:
         self.rotate(self.rotation_speed * dt)
     
     def update_bobbing(self, dt):
-        """Update the view bobbing effect"""
+        """Update view bobbing for walking animation effect"""
         if self.is_moving:
             # Update phase of the bobbing
             self.bob_phase += self.bob_frequency * dt
@@ -170,8 +169,9 @@ class Player:
 
 
 class Map:
+    """Tile-based map where each cell can be empty (0) or a wall (1+)"""
+    
     def __init__(self, grid, player_start=(2.0, 2.0)):
-        """Initialize map with a 2D grid where 1 = wall, 0 = empty"""
         self.grid = grid
         self.width = len(grid[0])
         self.height = len(grid)
@@ -180,13 +180,12 @@ class Map:
 
     @staticmethod
     def load_from_file(filename):
-        """Load map from a text file"""
+        """Load map from text file. 'P' marks player start, digits are tile types"""
         grid = []
         player_start = (2.0, 2.0)
         try:
             with open(filename, 'r') as file:
                 for y, line in enumerate(file):
-                    # Parse each character
                     row = []
                     for x, char in enumerate(line.strip()):
                         if char.isdigit():
@@ -203,7 +202,7 @@ class Map:
             sys.exit(1)
         
     def is_wall(self, x, y):
-        """Check if position is a wall"""
+        """Check if given world coordinates contain a wall"""
         map_x = int(x)
         map_y = int(y)
         
@@ -213,7 +212,7 @@ class Map:
         return self.grid[map_y][map_x] > 0
         
     def get_tile(self, x, y):
-        """Get tile value at position"""
+        """Get tile type at given world coordinates"""
         map_x = int(x)
         map_y = int(y)
         
@@ -224,7 +223,7 @@ class Map:
 
 
 def generate_texture(size=64, color1=(150, 150, 150), color2=(100, 100, 100)):
-    """Generates a simple checkerboard texture surface"""
+    """Generate a simple checkerboard texture"""
     surface = pygame.Surface((size, size))
     surface.fill(color1)
     # Draw a checker pattern
@@ -233,6 +232,8 @@ def generate_texture(size=64, color1=(150, 150, 150), color2=(100, 100, 100)):
     return surface
 
 class Raycaster:
+    """Handles 3D rendering using raycasting technique"""
+    
     def __init__(self, screen_width, screen_height):
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -329,7 +330,7 @@ class Raycaster:
             self.tex_height = 64
         
     def cast_ray(self, player, game_map, angle):
-        """Cast a single ray using DDA algorithm"""
+        """Cast a single ray using DDA (Digital Differential Analysis) algorithm"""
         rad = math.radians(angle)
         ray_dx = math.cos(rad)
         ray_dy = math.sin(rad)
@@ -405,201 +406,139 @@ class Raycaster:
         return distance, side, ray_dx, ray_dy, hit_val
         
     def render_floor_ceiling_vectorized(self, screen, player, game_map):
-        """Render BOTH floor and ceiling to a single surface (Fixes blue overlap)"""
+        """Render floor and ceiling using vectorized NumPy operations for performance"""
         
-        # Pre-calculate geometry
         half_fov_rad = math.radians(self.fov / 2)
         tan_half_fov = math.tan(half_fov_rad)
+        aspect_ratio = self.screen_width / self.screen_height
         screen_half = self.screen_height / 2 + player.bob_offset_y
         
-        # Get texture dimensions
         floor_tex_width = self.floor_texture.get_width()
         floor_tex_height = self.floor_texture.get_height()
         ceiling_tex_width = self.ceiling_texture.get_width()
         ceiling_tex_height = self.ceiling_texture.get_height()
         
-        # Pre-calculate player direction
         player_cos = math.cos(math.radians(player.rotation))
         player_sin = math.sin(math.radians(player.rotation))
         
-        # Calculate camera plane
-        plane_x = -player_sin * tan_half_fov
-        plane_y = player_cos * tan_half_fov
+        plane_x = -player_sin * tan_half_fov * aspect_ratio
+        plane_y = player_cos * tan_half_fov * aspect_ratio
         
-        # --- OPTIMIZATION: Use ONE surface for both ---
         buffer_surf = pygame.Surface((self.floor_width, self.floor_height))
-        
-        # Get pixel array
         buffer_pixels = pygame.surfarray.pixels3d(buffer_surf)
         
-        # Coordinate Grids
         x_coords, y_coords = np.meshgrid(
             np.arange(self.floor_width, dtype=np.float32),
             np.arange(self.floor_height, dtype=np.float32),
             indexing='xy'
         )
         
-        # Calculate row distances
         screen_y_coords = y_coords * self.floor_scale
         p = screen_y_coords - screen_half
         
-        # Avoid division by zero/horizon glitches
-        p = np.where(np.abs(p) < 1.0, np.sign(p) * 1.0, p)
+        epsilon = 1.0
+        p_safe = np.where(np.abs(p) < epsilon, np.sign(p) * epsilon, p)
         
-        # Calculate real world distance
         pos_z = 0.5 * self.screen_height
-        row_distance = pos_z / np.abs(p)
+        row_distance = pos_z / np.abs(p_safe)
         
-        # Ray direction calculation
         screen_x_norm = (2.0 * x_coords / self.floor_width) - 1.0
         ray_dir_x = player_cos + plane_x * screen_x_norm
         ray_dir_y = player_sin + plane_y * screen_x_norm
         
-        # World coordinates
         world_x = player.x + ray_dir_x * row_distance
         world_y = player.y + ray_dir_y * row_distance
         
-        # Fog Calculation
         fog_factor = np.clip(row_distance / 10.0, 0.0, 1.0)
         floor_fog = 1.0 - fog_factor * 0.6
         ceiling_fog = 1.0 - fog_factor * 0.7
         
-        # --- MASKS ---
-        # p > 0 is floor (bottom of screen), p < 0 is ceiling (top of screen)
-        floor_mask = p > 0
-        ceiling_mask = p < 0
+        floor_mask = p > epsilon
+        ceiling_mask = p < -epsilon
         
-        # --- FLOOR RENDERING ---
         if np.any(floor_mask):
             tex_x = (world_x * floor_tex_width).astype(np.int32) % floor_tex_width
             tex_y = (world_y * floor_tex_height).astype(np.int32) % floor_tex_height
             
-            # Extract colors
             colors = self.floor_array[tex_x[floor_mask], tex_y[floor_mask]]
-            
-            # Apply Fog
             fog_values = floor_fog[floor_mask]
             colors_fogged = (colors * fog_values[:, np.newaxis]).astype(np.uint8)
             
-            # Write to buffer
             x_indices = x_coords[floor_mask].astype(np.int32)
             y_indices = y_coords[floor_mask].astype(np.int32)
             buffer_pixels[x_indices, y_indices] = colors_fogged
 
-        # --- CEILING RENDERING ---
         if np.any(ceiling_mask):
             tex_x = (world_x * ceiling_tex_width).astype(np.int32) % ceiling_tex_width
             tex_y = (world_y * ceiling_tex_height).astype(np.int32) % ceiling_tex_height
             
-            # Extract colors
             colors = self.ceiling_array[tex_x[ceiling_mask], tex_y[ceiling_mask]]
-            
-            # Apply Fog
             fog_values = ceiling_fog[ceiling_mask]
             colors_fogged = (colors * fog_values[:, np.newaxis]).astype(np.uint8)
             
-            # Write to buffer (Using same buffer!)
             x_indices = x_coords[ceiling_mask].astype(np.int32)
             y_indices = y_coords[ceiling_mask].astype(np.int32)
             buffer_pixels[x_indices, y_indices] = colors_fogged
 
-        # Unlock the surface
         del buffer_pixels
         
-        # Scale and Blit ONCE
         scaled_surf = pygame.transform.scale(buffer_surf, (self.screen_width, self.screen_height))
         screen.blit(scaled_surf, (0, 0))
-    def render_3d_view(self, screen, player, game_map):
-        """Render the 3D view using raycasting with textures"""
         
-        # We DO NOT use aspect ratio for horizontal FOV calculation
-        # removing it ensures walls match the floor geometry exactly.
-
-        # Pre-calculate geometry with view bobbing
+    def render_3d_view(self, screen, player, game_map):
+        """Render the complete 3D view"""
+        
         half_fov_rad = math.radians(self.fov / 2)
         tan_half_fov = math.tan(half_fov_rad)
+        aspect_ratio = self.screen_width / self.screen_height
         screen_half = self.screen_height / 2 + player.bob_offset_y
         
-        # Use vectorized floor/ceiling rendering
         self.render_floor_ceiling_vectorized(screen, player, game_map)
         
-        # --- WALL RENDERING (Vertical slices) ---
         for ray_index in range(self.num_rays):
-            # Calculate Screen Coordinate
             screen_x = (2 * ray_index) / self.num_rays - 1
-            
-            # --- FIX: Removed '* aspect_ratio' ---
-            # This ensures the wall angles match the vector math used for the floor
-            angle_offset_rad = math.atan(screen_x * tan_half_fov) 
+            angle_offset_rad = math.atan(screen_x * tan_half_fov * aspect_ratio)
             angle_offset_deg = math.degrees(angle_offset_rad)
             
-            # Apply to player rotation
             ray_angle = player.rotation + angle_offset_deg
-            
-            # Cast ray - getting distance AND vectors
             distance, side, ray_dx, ray_dy, hit_val = self.cast_ray(player, game_map, ray_angle)
                         
-            # 1. Save the real distance for texture calculation
             raw_distance = distance 
-            
-            # 2. Fix fish-eye effect (Only for wall height!)
             distance *= math.cos(angle_offset_rad)
             
             if distance < 0.01:
                 distance = 0.01
                 
-            # Calculate wall height
             wall_height = int(self.screen_height / distance)
             wall_top = int(screen_half - (wall_height / 2))
             
-            # --- WALL TEXTURE CALCULATION ---
-            
-            # Get the correct texture
             current_texture = self.textures.get(hit_val, self.textures[1])
             cur_tex_width = current_texture.get_width()
             cur_tex_height = current_texture.get_height()
             
-            # Use raw_distance here, NOT distance
             if side == 0:
                 wall_x = player.y + raw_distance * ray_dy
             else:
                 wall_x = player.x + raw_distance * ray_dx
             
             wall_x -= math.floor(wall_x)
-            
-            # X coordinate on the texture
             tex_x = int(wall_x * cur_tex_width)
             
-            # Prevent texture mirroring
             if side == 0 and ray_dx > 0:
                 tex_x = cur_tex_width - tex_x - 1
             if side == 1 and ray_dy < 0:
                 tex_x = cur_tex_width - tex_x - 1
                 
-            # Create the vertical strip
-            # Ensure tex_x is within bounds
             tex_x = max(0, min(tex_x, cur_tex_width - 1))
-            
             tex_strip = current_texture.subsurface((tex_x, 0, 1, cur_tex_height))
-            
-            # Scale it to the height of the wall on screen
             render_width = int(self.ray_width) + 1 
             
-            # Optimization: Don't draw if invisible or crazy huge
             if wall_height > 0 and wall_height < 8000:
                 scaled_strip = pygame.transform.scale(tex_strip, (render_width, wall_height))
                 
-                # --- DEPTH SHADING (FOG) ---
-                # Calculate fog intensity based on distance (0.0 = clear, 1.0 = fully black)
                 fog_intensity = min(1.0, distance / 10.0)
-                
-                # Base fog alpha (matches floor fog calculation: 1.0 - fog_factor * 0.6)
                 base_fog_alpha = int(fog_intensity * 0.6 * 255)
-                
-                # Side shading alpha (darken Y-sides)
                 side_alpha = 80 if side == 1 else 0
-                
-                # Combine fog and side shading (additive, capped at 255)
                 total_alpha = min(255, base_fog_alpha + side_alpha)
                 
                 if total_alpha > 0:
@@ -611,7 +550,7 @@ class Raycaster:
                 screen.blit(scaled_strip, (ray_index * self.ray_width, wall_top))
 
     def render_minimap(self, screen, player, game_map):
-        """Render a 2D minimap in the corner"""
+        """Render 2D minimap overlay"""
         minimap_size = 150
         minimap_scale = minimap_size / max(game_map.width, game_map.height)
         minimap_x = screen.get_width() - minimap_size - 10
@@ -652,6 +591,8 @@ class Raycaster:
 
 
 class Game:
+    """Main game class handling initialization, game loop, and events"""
+    
     def __init__(self):
         pygame.init()
         
@@ -754,7 +695,7 @@ class Game:
 
 
     def handle_player_input(self, dt):
-        """Handle continuous keyboard input for player movement"""
+        """Process continuous keyboard input for smooth movement"""
         keys = pygame.key.get_pressed()
         
         # Initialize total movement vector

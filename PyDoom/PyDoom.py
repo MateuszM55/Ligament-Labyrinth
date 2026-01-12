@@ -215,7 +215,7 @@ class Raycaster:
         # PERFORMANCE SETTING:
         # Texture mapping in Python is slow. We reduce resolution to keep FPS high.
         # // 2 means half resolution (e.g., 800 rays for 1600px screen).
-        self.num_rays = screen_width * 2
+        self.num_rays = screen_width
         self.ray_width = self.screen_width / self.num_rays
         
         self.wall_buffer = []  # Cache for wall rendering

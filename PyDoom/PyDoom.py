@@ -298,8 +298,11 @@ class Raycaster:
             
             # Cast ray - getting distance AND vectors
             distance, side, ray_dx, ray_dy = self.cast_ray(player, game_map, ray_angle)
+                        
+            # 1. Save the real distance for texture calculation
+            raw_distance = distance 
             
-            # Fix fish-eye effect
+            # 2. Fix fish-eye effect (Only for wall height!)
             distance *= math.cos(angle_offset_rad)
             
             if distance < 0.01:
@@ -311,11 +314,11 @@ class Raycaster:
             
             # --- TEXTURE CALCULATION ---
             
-            # 1. Calculate exactly where the wall was hit
+            # 3. Use raw_distance here, NOT distance
             if side == 0:
-                wall_x = player.y + distance * ray_dy
+                wall_x = player.y + raw_distance * ray_dy
             else:
-                wall_x = player.x + distance * ray_dx
+                wall_x = player.x + raw_distance * ray_dx
             
             wall_x -= math.floor(wall_x)
             
@@ -329,11 +332,9 @@ class Raycaster:
                 tex_x = self.tex_width - tex_x - 1
                 
             # 4. Create the vertical strip
-            # We use a subsurface: (x, y, width, height)
             tex_strip = self.wall_texture.subsurface((tex_x, 0, 1, self.tex_height))
             
             # 5. Scale it to the height of the wall on screen
-            # We add 1 to width to prevent gap artifacts
             render_width = int(self.ray_width) + 1 
             
             # Optimization: Don't draw if invisible or crazy huge
@@ -343,7 +344,7 @@ class Raycaster:
                 # 6. Darken the Y-sides for simple lighting effect
                 if side == 1:
                     darken_surf = pygame.Surface((render_width, wall_height))
-                    darken_surf.set_alpha(80) # 0-255 transparency
+                    darken_surf.set_alpha(80)
                     darken_surf.fill((0,0,0))
                     scaled_strip.blit(darken_surf, (0,0))
 

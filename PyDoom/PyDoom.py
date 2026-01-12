@@ -3,6 +3,7 @@ import sys
 import math
 import os
 import re
+import numpy as np
 from pygame.locals import *
 
 class Player:
@@ -241,13 +242,21 @@ class Raycaster:
         # PERFORMANCE SETTING:
         # Texture mapping in Python is slow. We reduce resolution to keep FPS high.
         # // 2 means half resolution (e.g., 800 rays for 1600px screen).
-        self.num_rays = screen_width
+        self.num_rays = screen_width // 2
         self.ray_width = self.screen_width / self.num_rays
+        
+        # Floor/Ceiling resolution scale factor
+        # Higher = more pixelated but much faster (4 = 1/16th the pixels, 93% less work)
+        self.floor_scale = 4
+        self.floor_width = screen_width // self.floor_scale
+        self.floor_height = screen_height // self.floor_scale
         
         self.wall_buffer = []  # Cache for wall rendering
         
         # Initialize Textures
         self.textures = {}
+        self.floor_texture = None
+        self.ceiling_texture = None
         texture_dir = "textures"
         
         # Load textures from directory
@@ -264,6 +273,24 @@ class Raycaster:
                             print(f"Loaded texture {tex_id} from {filename}")
                         except pygame.error:
                             print(f"Failed to load texture: {filename}")
+                    
+                    # Load floor texture
+                    if "floor" in filename.lower():
+                        try:
+                            full_path = os.path.join(texture_dir, filename)
+                            self.floor_texture = pygame.image.load(full_path).convert()
+                            print(f"Loaded floor texture from {filename}")
+                        except pygame.error:
+                            print(f"Failed to load floor texture: {filename}")
+                    
+                    # Load ceiling texture
+                    if "ceiling" in filename.lower():
+                        try:
+                            full_path = os.path.join(texture_dir, filename)
+                            self.ceiling_texture = pygame.image.load(full_path).convert()
+                            print(f"Loaded ceiling texture from {filename}")
+                        except pygame.error:
+                            print(f"Failed to load ceiling texture: {filename}")
                             
         # Fallback: Generate textures if they weren't loaded from files
         # This ensures the game runs even if the texture folder is empty or files are missing
@@ -278,6 +305,18 @@ class Raycaster:
             if i not in self.textures:
                 c1, c2 = texture_colors.get(i, ((150, 150, 150), (100, 100, 100)))
                 self.textures[i] = generate_texture(64, c1, c2)
+        
+        # Generate floor texture if not loaded
+        if self.floor_texture is None:
+            self.floor_texture = generate_texture(64, (80, 80, 80), (60, 60, 60))
+        
+        # Generate ceiling texture if not loaded  
+        if self.ceiling_texture is None:
+            self.ceiling_texture = generate_texture(64, (40, 40, 60), (30, 30, 50))
+        
+        # Convert textures to numpy arrays for fast pixel access
+        self.floor_array = pygame.surfarray.array3d(self.floor_texture)
+        self.ceiling_array = pygame.surfarray.array3d(self.ceiling_texture)
                 
         # Default texture properties (assuming all textures share same size for simplicity)
         # We use texture 1 as the reference for dimensions
@@ -365,6 +404,136 @@ class Raycaster:
             
         return distance, side, ray_dx, ray_dy, hit_val
         
+    def render_floor_ceiling_vectorized(self, screen, player, game_map):
+        """Render floor and ceiling using full NumPy vectorization (no Python loops)"""
+        
+        # Pre-calculate geometry with view bobbing
+        half_fov_rad = math.radians(self.fov / 2)
+        tan_half_fov = math.tan(half_fov_rad)
+        screen_half = self.screen_height / 2 + player.bob_offset_y
+        
+        # Get texture dimensions
+        floor_tex_width = self.floor_texture.get_width()
+        floor_tex_height = self.floor_texture.get_height()
+        ceiling_tex_width = self.ceiling_texture.get_width()
+        ceiling_tex_height = self.ceiling_texture.get_height()
+        
+        # Pre-calculate player direction
+        player_cos = math.cos(math.radians(player.rotation))
+        player_sin = math.sin(math.radians(player.rotation))
+        
+        # Calculate camera plane perpendicular to view direction
+        plane_x = -player_sin * tan_half_fov
+        plane_y = player_cos * tan_half_fov
+        
+        # Create LOW-RESOLUTION surfaces for floor and ceiling
+        floor_surf = pygame.Surface((self.floor_width, self.floor_height))
+        ceiling_surf = pygame.Surface((self.floor_width, self.floor_height))
+        
+        # Get pixel arrays for direct manipulation
+        floor_pixels = pygame.surfarray.pixels3d(floor_surf)
+        ceiling_pixels = pygame.surfarray.pixels3d(ceiling_surf)
+        
+        # --- NUMPY VECTORIZATION: Process ALL pixels at once ---
+        
+        # Create coordinate grids for all pixels
+        # x_coords: [0, 1, 2, ..., floor_width-1] repeated for each row
+        # y_coords: [0, 1, 2, ..., floor_height-1] repeated for each column
+        x_coords, y_coords = np.meshgrid(
+            np.arange(self.floor_width, dtype=np.float32),
+            np.arange(self.floor_height, dtype=np.float32),
+            indexing='xy'
+        )
+        
+        # Convert low-res coordinates to full-screen coordinates
+        screen_y_coords = y_coords * self.floor_scale
+        
+        # Calculate distance from horizon for each row
+        p = screen_y_coords - screen_half
+        
+        # Avoid division by zero at horizon
+        # Replace values near zero with a small number
+        p = np.where(np.abs(p) < 1.0, np.sign(p) * 1.0, p)
+        
+        # Calculate row distance for all pixels at once
+        pos_z = 0.5 * self.screen_height
+        row_distance = pos_z / np.abs(p)
+        
+        # Calculate ray direction for each column
+        # Normalized screen x: from -1 (left) to +1 (right)
+        screen_x_norm = (2.0 * x_coords / self.floor_width) - 1.0
+        
+        # Ray directions for each column
+        ray_dir_x = player_cos + plane_x * screen_x_norm
+        ray_dir_y = player_sin + plane_y * screen_x_norm
+        
+        # Calculate world coordinates for all pixels
+        world_x = player.x + ray_dir_x * row_distance
+        world_y = player.y + ray_dir_y * row_distance
+        
+        # Convert world coordinates to texture coordinates
+        # Use modulo for tiling
+        tex_x_floor = (world_x * floor_tex_width).astype(np.int32) % floor_tex_width
+        tex_y_floor = (world_y * floor_tex_height).astype(np.int32) % floor_tex_height
+        
+        tex_x_ceiling = (world_x * ceiling_tex_width).astype(np.int32) % ceiling_tex_width
+        tex_y_ceiling = (world_y * ceiling_tex_height).astype(np.int32) % ceiling_tex_height
+        
+        # Calculate fog factor for all pixels
+        fog_factor = np.clip(row_distance / 10.0, 0.0, 1.0)
+        floor_fog = 1.0 - fog_factor * 0.6
+        ceiling_fog = 1.0 - fog_factor * 0.7
+        
+        # Create masks for floor and ceiling
+        floor_mask = p > 0  # Below horizon
+        ceiling_mask = p < 0  # Above horizon
+        
+        # --- ADVANCED INDEXING: Assign all pixels at once ---
+        
+        # Floor rendering (vectorized)
+        if np.any(floor_mask):
+            # Extract texture colors for all floor pixels using advanced indexing
+            floor_colors = self.floor_array[tex_x_floor[floor_mask], tex_y_floor[floor_mask]]
+            
+            # Apply fog to all colors at once
+            floor_fog_values = floor_fog[floor_mask]
+            floor_colors_fogged = (floor_colors * floor_fog_values[:, np.newaxis]).astype(np.uint8)
+            
+            # Get coordinates where we need to write
+            x_floor = x_coords[floor_mask].astype(np.int32)
+            y_floor = y_coords[floor_mask].astype(np.int32)
+            
+            # Assign all floor pixels at once
+            floor_pixels[x_floor, y_floor] = floor_colors_fogged
+        
+        # Ceiling rendering (vectorized)
+        if np.any(ceiling_mask):
+            # Extract texture colors for all ceiling pixels using advanced indexing
+            ceiling_colors = self.ceiling_array[tex_x_ceiling[ceiling_mask], tex_y_ceiling[ceiling_mask]]
+            
+            # Apply fog to all colors at once
+            ceiling_fog_values = ceiling_fog[ceiling_mask]
+            ceiling_colors_fogged = (ceiling_colors * ceiling_fog_values[:, np.newaxis]).astype(np.uint8)
+            
+            # Get coordinates where we need to write
+            x_ceiling = x_coords[ceiling_mask].astype(np.int32)
+            y_ceiling = y_coords[ceiling_mask].astype(np.int32)
+            
+            # Assign all ceiling pixels at once
+            ceiling_pixels[x_ceiling, y_ceiling] = ceiling_colors_fogged
+        
+        # Release pixel arrays
+        del floor_pixels
+        del ceiling_pixels
+        
+        # Scale up the low-res surfaces to full screen size
+        floor_surf_scaled = pygame.transform.scale(floor_surf, (self.screen_width, self.screen_height))
+        ceiling_surf_scaled = pygame.transform.scale(ceiling_surf, (self.screen_width, self.screen_height))
+        
+        # Blit scaled floor and ceiling to screen
+        screen.blit(floor_surf_scaled, (0, 0))
+        screen.blit(ceiling_surf_scaled, (0, 0))
+    
     def render_3d_view(self, screen, player, game_map):
         """Render the 3D view using raycasting with textures"""
         
@@ -375,12 +544,10 @@ class Raycaster:
         tan_half_fov = math.tan(half_fov_rad)
         screen_half = self.screen_height / 2 + player.bob_offset_y
         
-        # Batch render ceiling and floor with bobbing offset
-        ceiling_height = screen_half
-        floor_top = screen_half
-        pygame.draw.rect(screen, (50, 50, 50), (0, 0, self.screen_width, ceiling_height))
-        pygame.draw.rect(screen, (30, 30, 30), (0, floor_top, self.screen_width, self.screen_height - floor_top))
+        # Use vectorized floor/ceiling rendering
+        self.render_floor_ceiling_vectorized(screen, player, game_map)
         
+        # --- WALL RENDERING (Vertical slices) ---
         for ray_index in range(self.num_rays):
             # Calculate Screen Coordinate
             screen_x = (2 * ray_index) / self.num_rays - 1
@@ -407,14 +574,14 @@ class Raycaster:
             wall_height = int(self.screen_height / distance)
             wall_top = int(screen_half - (wall_height / 2))
             
-            # --- TEXTURE CALCULATION ---
+            # --- WALL TEXTURE CALCULATION ---
             
             # Get the correct texture
             current_texture = self.textures.get(hit_val, self.textures[1])
             cur_tex_width = current_texture.get_width()
             cur_tex_height = current_texture.get_height()
             
-            # 3. Use raw_distance here, NOT distance
+            # Use raw_distance here, NOT distance
             if side == 0:
                 wall_x = player.y + raw_distance * ray_dy
             else:
@@ -422,29 +589,29 @@ class Raycaster:
             
             wall_x -= math.floor(wall_x)
             
-            # 2. X coordinate on the texture
+            # X coordinate on the texture
             tex_x = int(wall_x * cur_tex_width)
             
-            # 3. Prevent texture mirroring
+            # Prevent texture mirroring
             if side == 0 and ray_dx > 0:
                 tex_x = cur_tex_width - tex_x - 1
             if side == 1 and ray_dy < 0:
                 tex_x = cur_tex_width - tex_x - 1
                 
-            # 4. Create the vertical strip
+            # Create the vertical strip
             # Ensure tex_x is within bounds
             tex_x = max(0, min(tex_x, cur_tex_width - 1))
             
             tex_strip = current_texture.subsurface((tex_x, 0, 1, cur_tex_height))
             
-            # 5. Scale it to the height of the wall on screen
+            # Scale it to the height of the wall on screen
             render_width = int(self.ray_width) + 1 
             
             # Optimization: Don't draw if invisible or crazy huge
             if wall_height > 0 and wall_height < 8000:
                 scaled_strip = pygame.transform.scale(tex_strip, (render_width, wall_height))
                 
-                # 6. Darken the Y-sides for simple lighting effect
+                # Darken the Y-sides for simple lighting effect
                 if side == 1:
                     darken_surf = pygame.Surface((render_width, wall_height))
                     darken_surf.set_alpha(80)

@@ -141,28 +141,34 @@ class Player:
 
 
 class Map:
-    def __init__(self, grid):
+    def __init__(self, grid, player_start=(2.0, 2.0)):
         """Initialize map with a 2D grid where 1 = wall, 0 = empty"""
         self.grid = grid
         self.width = len(grid[0])
         self.height = len(grid)
         self.tile_size = 64
+        self.player_start = player_start
 
     @staticmethod
     def load_from_file(filename):
         """Load map from a text file"""
         grid = []
+        player_start = (2.0, 2.0)
         try:
             with open(filename, 'r') as file:
-                for line in file:
-                    # Parse each character as an integer (1 or 0)
+                for y, line in enumerate(file):
+                    # Parse each character
                     row = []
-                    for char in line.strip():
+                    for x, char in enumerate(line.strip()):
                         if char.isdigit():
                             row.append(int(char))
+                        elif char.upper() == 'P':
+                            # Found player start position
+                            player_start = (float(x), float(y))
+                            row.append(0)  # Treat player start as empty floor
                     if row:
                         grid.append(row)
-            return Map(grid)
+            return Map(grid, player_start)
         except FileNotFoundError:
             print(f"Error: map file '{filename}' not found.")
             sys.exit(1)
@@ -442,8 +448,9 @@ class Game:
         self.game_map = Map.load_from_file("map.txt")
     
         
-        # Initialize player in an open area
-        self.player = Player(10, 10, 0.0)
+        # Initialize player at the loaded start position
+        start_x, start_y = self.game_map.player_start
+        self.player = Player(start_x, start_y, 0.0)
         
         # Initialize raycaster
         self.raycaster = Raycaster(self.screen_width, self.screen_height)

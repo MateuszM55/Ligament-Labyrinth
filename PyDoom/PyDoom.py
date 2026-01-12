@@ -537,7 +537,8 @@ class Raycaster:
     def render_3d_view(self, screen, player, game_map):
         """Render the 3D view using raycasting with textures"""
         
-        aspect_ratio = self.screen_width / self.screen_height
+        # We DO NOT use aspect ratio for horizontal FOV calculation
+        # removing it ensures walls match the floor geometry exactly.
 
         # Pre-calculate geometry with view bobbing
         half_fov_rad = math.radians(self.fov / 2)
@@ -552,7 +553,9 @@ class Raycaster:
             # Calculate Screen Coordinate
             screen_x = (2 * ray_index) / self.num_rays - 1
             
-            angle_offset_rad = math.atan(screen_x * tan_half_fov * aspect_ratio)
+            # --- FIX: Removed '* aspect_ratio' ---
+            # This ensures the wall angles match the vector math used for the floor
+            angle_offset_rad = math.atan(screen_x * tan_half_fov) 
             angle_offset_deg = math.degrees(angle_offset_rad)
             
             # Apply to player rotation

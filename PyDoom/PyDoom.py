@@ -21,6 +21,13 @@ class Player:
         self.collision_radius = 0.2  # Radius for collision detection
         self.anticipation_frames = 2  # Number of frames to look ahead
         
+        # View bobbing settings
+        self.bob_amplitude = 5.0  # Height of bob in pixels
+        self.bob_frequency = 1  # Speed of bobbing (cycles per second)
+        self.bob_phase = 0.0  # Current phase in the bob cycle
+        self.bob_offset_y = 0.0  # Current vertical offset
+        self.is_moving = False  # Track if player is moving
+        
         # Pre-calculate collision offsets
         self.collision_offsets = [
             (self.collision_radius, 0),
@@ -140,6 +147,25 @@ class Player:
     def look_right(self, dt):
         """Rotate player right"""
         self.rotate(self.rotation_speed * dt)
+    
+    def update_bobbing(self, dt):
+        """Update the view bobbing effect"""
+        if self.is_moving:
+            # Update phase of the bobbing
+            self.bob_phase += self.bob_frequency * dt
+            # Keep phase in reasonable range to prevent overflow
+            if self.bob_phase > 2 * math.pi * 100:
+                self.bob_phase = 0
+            
+            # Calculate vertical offset using sine wave
+            self.bob_offset_y = math.sin(self.bob_phase * 2 * math.pi) * self.bob_amplitude
+        else:
+            # Smoothly return to neutral position when not moving
+            if abs(self.bob_offset_y) > 0.1:
+                self.bob_offset_y *= 0.8
+            else:
+                self.bob_offset_y = 0.0
+                self.bob_phase = 0.0
 
 
 class Map:
@@ -344,14 +370,16 @@ class Raycaster:
         
         aspect_ratio = self.screen_width / self.screen_height
 
-        # Pre-calculate geometry
+        # Pre-calculate geometry with view bobbing
         half_fov_rad = math.radians(self.fov / 2)
         tan_half_fov = math.tan(half_fov_rad)
-        screen_half = self.screen_height / 2
+        screen_half = self.screen_height / 2 + player.bob_offset_y
         
-        # Batch render ceiling and floor
-        pygame.draw.rect(screen, (50, 50, 50), (0, 0, self.screen_width, screen_half))
-        pygame.draw.rect(screen, (30, 30, 30), (0, screen_half, self.screen_width, screen_half))
+        # Batch render ceiling and floor with bobbing offset
+        ceiling_height = screen_half
+        floor_top = screen_half
+        pygame.draw.rect(screen, (50, 50, 50), (0, 0, self.screen_width, ceiling_height))
+        pygame.draw.rect(screen, (30, 30, 30), (0, floor_top, self.screen_width, self.screen_height - floor_top))
         
         for ray_index in range(self.num_rays):
             # Calculate Screen Coordinate
@@ -599,9 +627,12 @@ class Game:
             total_dx += -self.player._sin_cache * move_speed
             total_dy += self.player._cos_cache * move_speed
 
+        # Track if player is moving for view bobbing
+        self.player.is_moving = (keys[K_w] or keys[K_s] or keys[K_a] or keys[K_d])
+
         # 2. Normalize vector 
         # Without this, moving diagonally (W+D) makes you move ~1.4x faster
-        if keys[K_w] or keys[K_s] or keys[K_a] or keys[K_d]:
+        if self.player.is_moving:
             # If we are moving diagonally (non-zero in both axes relative to player), 
             # the magnitude will be greater than move_speed
             current_speed = math.sqrt(total_dx**2 + total_dy**2)
@@ -624,6 +655,9 @@ class Game:
         """Update game logic"""
         if not self.paused:
             self.handle_player_input(dt)
+            
+            # Update view bobbing
+            self.player.update_bobbing(dt)
             
     def render(self):
         """Render everything to the screen"""

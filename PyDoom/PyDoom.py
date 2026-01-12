@@ -181,7 +181,7 @@ class Map:
         if map_x < 0 or map_x >= self.width or map_y < 0 or map_y >= self.height:
             return True
             
-        return self.grid[map_y][map_x] == 1
+        return self.grid[map_y][map_x] > 0
         
     def get_tile(self, x, y):
         """Get tile value at position"""
@@ -218,11 +218,36 @@ class Raycaster:
         
         self.wall_buffer = []  # Cache for wall rendering
         
-        # Initialize Texture
-        # In the future, use: self.wall_texture = pygame.image.load("wall.png").convert()
-        self.wall_texture = generate_texture(64, (120, 120, 120), (80, 80, 80))
-        self.tex_width = self.wall_texture.get_width()
-        self.tex_height = self.wall_texture.get_height()
+        # Initialize Textures
+        self.textures = {}
+        # Define texture mapping (ID -> filename)
+        texture_files = {
+            1: "Asset 1.png",
+            2: "Asset 2.png",
+            3: "Asset 3.png"
+        }
+        
+        # Colors for generated textures if files are missing
+        texture_colors = {
+            1: ((150, 150, 150), (100, 100, 100)),
+            2: ((150, 100, 100), (100, 50, 50)),   # Red tint
+            3: ((100, 150, 100), (50, 100, 50))    # Green tint
+        }
+
+        # Load or generate textures
+        for i in range(1, 4):
+            filename = texture_files.get(i)
+            try:
+                # Try to load image as requested
+                self.textures[i] = pygame.image.load(filename).convert()
+            except (pygame.error, FileNotFoundError):
+                # Fallback to generated texture
+                c1, c2 = texture_colors.get(i, ((150, 150, 150), (100, 100, 100)))
+                self.textures[i] = generate_texture(64, c1, c2)
+                
+        # Default texture properties (assuming all textures share same size for simplicity)
+        self.tex_width = self.textures[1].get_width()
+        self.tex_height = self.textures[1].get_height()
         
     def cast_ray(self, player, game_map, angle):
         """Cast a single ray using DDA algorithm"""
@@ -263,6 +288,7 @@ class Raycaster:
         
         # Perform DDA
         hit = False
+        hit_val = 0
         side = 0  # 0 for x-side, 1 for y-side
         max_iterations = 50
         iterations = 0
@@ -281,8 +307,10 @@ class Raycaster:
             iterations += 1
             
             # Check if ray has hit a wall
-            if game_map.get_tile(map_x, map_y) == 1:
+            tile = game_map.get_tile(map_x, map_y)
+            if tile > 0:
                 hit = True
+                hit_val = tile
         
         # Calculate distance
         if side == 0:
@@ -295,7 +323,7 @@ class Raycaster:
         if distance > self.max_depth or distance < 0:
             distance = self.max_depth
             
-        return distance, side, ray_dx, ray_dy
+        return distance, side, ray_dx, ray_dy, hit_val
         
     def render_3d_view(self, screen, player, game_map):
         """Render the 3D view using raycasting with textures"""
@@ -322,7 +350,7 @@ class Raycaster:
             ray_angle = player.rotation + angle_offset_deg
             
             # Cast ray - getting distance AND vectors
-            distance, side, ray_dx, ray_dy = self.cast_ray(player, game_map, ray_angle)
+            distance, side, ray_dx, ray_dy, hit_val = self.cast_ray(player, game_map, ray_angle)
                         
             # 1. Save the real distance for texture calculation
             raw_distance = distance 
@@ -339,6 +367,11 @@ class Raycaster:
             
             # --- TEXTURE CALCULATION ---
             
+            # Get the correct texture
+            current_texture = self.textures.get(hit_val, self.textures[1])
+            cur_tex_width = current_texture.get_width()
+            cur_tex_height = current_texture.get_height()
+            
             # 3. Use raw_distance here, NOT distance
             if side == 0:
                 wall_x = player.y + raw_distance * ray_dy
@@ -348,16 +381,19 @@ class Raycaster:
             wall_x -= math.floor(wall_x)
             
             # 2. X coordinate on the texture
-            tex_x = int(wall_x * self.tex_width)
+            tex_x = int(wall_x * cur_tex_width)
             
             # 3. Prevent texture mirroring
             if side == 0 and ray_dx > 0:
-                tex_x = self.tex_width - tex_x - 1
+                tex_x = cur_tex_width - tex_x - 1
             if side == 1 and ray_dy < 0:
-                tex_x = self.tex_width - tex_x - 1
+                tex_x = cur_tex_width - tex_x - 1
                 
             # 4. Create the vertical strip
-            tex_strip = self.wall_texture.subsurface((tex_x, 0, 1, self.tex_height))
+            # Ensure tex_x is within bounds
+            tex_x = max(0, min(tex_x, cur_tex_width - 1))
+            
+            tex_strip = current_texture.subsurface((tex_x, 0, 1, cur_tex_height))
             
             # 5. Scale it to the height of the wall on screen
             render_width = int(self.ray_width) + 1 
@@ -389,10 +425,17 @@ class Raycaster:
         # Draw map tiles
         for y in range(game_map.height):
             for x in range(game_map.width):
-                if game_map.grid[y][x] == 1:
+                tile = game_map.grid[y][x]
+                if tile > 0:
                     tile_x = minimap_x + x * minimap_scale
                     tile_y = minimap_y + y * minimap_scale
-                    pygame.draw.rect(screen, (100, 100, 100),
+                    
+                    # Different colors for different walls
+                    color = (100, 100, 100)
+                    if tile == 2: color = (100, 50, 50)
+                    if tile == 3: color = (50, 100, 50)
+                    
+                    pygame.draw.rect(screen, color,
                                    (tile_x, tile_y, minimap_scale, minimap_scale))
         
         # Draw player

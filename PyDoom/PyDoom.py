@@ -1,71 +1,81 @@
+"""PyDoom - A raycasting game engine inspired by Doom."""
+
 import pygame
 import sys
 import math
-import os
-import re
+from typing import Tuple, List, Optional
 import numpy as np
 from pygame.locals import *
 
+from settings import settings
+from managers import AssetManager
+
+
 class Player:
-    """Represents the player with position, rotation, and movement capabilities"""
+    """Represents the player with position, rotation, and movement capabilities."""
     
-    def __init__(self, x, y, rotation=0.0):
-        self.x = float(x)
-        self.y = float(y)
-        self.rotation = float(rotation)
+    def __init__(self, x: float, y: float, rotation: float = 0.0) -> None:
+        """Initialize the player.
         
-        # Movement settings
-        self.move_speed = 3.0  # units per second
-        self.rotation_speed = 120.0  # degrees per second
-        self.mouse_sensitivity = 0.2  # Mouse sensitivity multiplier
+        Args:
+            x: Initial x position
+            y: Initial y position
+            rotation: Initial rotation in degrees
+        """
+        self.x: float = float(x)
+        self.y: float = float(y)
+        self.rotation: float = float(rotation)
         
-        # Collision settings
-        self.collision_radius = 0.2  # Radius for collision detection
-        self.anticipation_frames = 2  # Number of frames to look ahead
-        
-        # View bobbing settings
-        self.bob_amplitude = 5.0  # Height of bob in pixels
-        self.bob_frequency = 1  # Speed of bobbing (cycles per second)
-        self.bob_phase = 0.0  # Current phase in the bob cycle
-        self.bob_offset_y = 0.0  # Current vertical offset
-        self.is_moving = False  # Track if player is moving
+        # View bobbing state
+        self.bob_phase: float = 0.0
+        self.bob_offset_y: float = 0.0
+        self.is_moving: bool = False
         
         # Pre-calculate collision offsets
-        self.collision_offsets = [
-            (self.collision_radius, 0),
-            (-self.collision_radius, 0),
-            (0, self.collision_radius),
-            (0, -self.collision_radius),
-            (self.collision_radius * 0.707, self.collision_radius * 0.707),
-            (-self.collision_radius * 0.707, self.collision_radius * 0.707),
-            (self.collision_radius * 0.707, -self.collision_radius * 0.707),
-            (-self.collision_radius * 0.707, -self.collision_radius * 0.707)
+        radius = settings.player.collision_radius
+        self.collision_offsets: List[Tuple[float, float]] = [
+            (radius, 0),
+            (-radius, 0),
+            (0, radius),
+            (0, -radius),
+            (radius * 0.707, radius * 0.707),
+            (-radius * 0.707, radius * 0.707),
+            (radius * 0.707, -radius * 0.707),
+            (-radius * 0.707, -radius * 0.707)
         ]
         
         # Cache for trigonometric calculations
-        self._cos_cache = math.cos(math.radians(rotation))
-        self._sin_cache = math.sin(math.radians(rotation))
+        self._cos_cache: float = math.cos(math.radians(rotation))
+        self._sin_cache: float = math.sin(math.radians(rotation))
     
-    def _check_collision(self, x, y, game_map):
-        """Check if position collides with walls using multiple points around player radius"""
-        # Check the center point
+    def _check_collision(self, x: float, y: float, game_map: 'Map') -> bool:
+        """Check if position collides with walls using multiple points.
+        
+        Args:
+            x: X coordinate to check
+            y: Y coordinate to check
+            game_map: The game map to check against
+            
+        Returns:
+            True if collision detected, False otherwise
+        """
         if game_map.is_wall(x, y):
             return True
         
-        # Use the pre-calculated list
         for offset_x, offset_y in self.collision_offsets:
             if game_map.is_wall(x + offset_x, y + offset_y):
                 return True
         
         return False
     
-    def _move_with_collision(self, dx, dy, game_map):
-        """Move player with collision detection and wall sliding"""
-        # Calculate anticipated position (look ahead)
-        anticipated_x = self.x + dx * self.anticipation_frames
-        anticipated_y = self.y + dy * self.anticipation_frames
-    
-        # Check if final position will collide
+    def _move_with_collision(self, dx: float, dy: float, game_map: 'Map') -> None:
+        """Move player with collision detection and wall sliding.
+        
+        Args:
+            dx: Change in x position
+            dy: Change in y position
+            game_map: The game map to check collisions against
+        """
         new_x = self.x + dx
         new_y = self.y + dy
         
@@ -76,91 +86,140 @@ class Player:
             return
 
         # If diagonal movement failed, try sliding along walls
-        # Try X movement only
         if not self._check_collision(new_x, self.y, game_map):
             self.x = new_x
 
-        # Try Y movement only
         if not self._check_collision(self.x, new_y, game_map):
             self.y = new_y
         
-    def set_position(self, x, y):
-        """Set player position"""
+    def set_position(self, x: float, y: float) -> None:
+        """Set player position.
+        
+        Args:
+            x: New x position
+            y: New y position
+        """
         self.x = float(x)
         self.y = float(y)
         
-    def set_rotation(self, rotation):
-        """Set player rotation"""
+    def set_rotation(self, rotation: float) -> None:
+        """Set player rotation.
+        
+        Args:
+            rotation: New rotation in degrees
+        """
         self.rotation = float(rotation)
         self._update_trig_cache()
         
-    def _update_trig_cache(self):
-        """Cache trigonometric calculations for performance"""
+    def _update_trig_cache(self) -> None:
+        """Cache trigonometric calculations for performance."""
         rad = math.radians(self.rotation)
         self._cos_cache = math.cos(rad)
         self._sin_cache = math.sin(rad)
         
-    def move(self, dx, dy):
-        """Move player by delta amounts"""
+    def move(self, dx: float, dy: float) -> None:
+        """Move player by delta amounts.
+        
+        Args:
+            dx: Change in x position
+            dy: Change in y position
+        """
         self.x += float(dx)
         self.y += float(dy)
         
-    def rotate(self, degrees):
-        """Rotate player by degrees"""
+    def rotate(self, degrees: float) -> None:
+        """Rotate player by degrees.
+        
+        Args:
+            degrees: Rotation amount in degrees
+        """
         self.rotation = (self.rotation + float(degrees)) % 360.0
         self._update_trig_cache()
         
-    def rotate_from_mouse(self, dx):
-        """Rotate player based on mouse movement"""
-        self.rotate(dx * self.mouse_sensitivity)
+    def rotate_from_mouse(self, dx: float) -> None:
+        """Rotate player based on mouse movement.
         
-    def move_forward(self, dt, game_map):
-        """Move player forward in the direction they're facing with anticipation"""
-        dx = self._cos_cache * self.move_speed * dt
-        dy = self._sin_cache * self.move_speed * dt
+        Args:
+            dx: Mouse movement delta
+        """
+        self.rotate(dx * settings.player.mouse_sensitivity)
+        
+    def move_forward(self, dt: float, game_map: 'Map') -> None:
+        """Move player forward in the direction they're facing.
+        
+        Args:
+            dt: Delta time in seconds
+            game_map: The game map to check collisions against
+        """
+        dx = self._cos_cache * settings.player.move_speed * dt
+        dy = self._sin_cache * settings.player.move_speed * dt
         self._move_with_collision(dx, dy, game_map)
         
-    def move_backward(self, dt, game_map):
-        """Move player backward with anticipation"""
-        dx = -self._cos_cache * self.move_speed * dt
-        dy = -self._sin_cache * self.move_speed * dt
+    def move_backward(self, dt: float, game_map: 'Map') -> None:
+        """Move player backward.
+        
+        Args:
+            dt: Delta time in seconds
+            game_map: The game map to check collisions against
+        """
+        dx = -self._cos_cache * settings.player.move_speed * dt
+        dy = -self._sin_cache * settings.player.move_speed * dt
         self._move_with_collision(dx, dy, game_map)
         
-    def strafe_left(self, dt, game_map):
-        """Strafe left (perpendicular to facing direction) with anticipation"""
-        # Left is 90 degrees counter-clockwise: (cos, sin) -> (sin, -cos)
-        dx = self._sin_cache * self.move_speed * dt
-        dy = -self._cos_cache * self.move_speed * dt
+    def strafe_left(self, dt: float, game_map: 'Map') -> None:
+        """Strafe left perpendicular to facing direction.
+        
+        Args:
+            dt: Delta time in seconds
+            game_map: The game map to check collisions against
+        """
+        dx = self._sin_cache * settings.player.move_speed * dt
+        dy = -self._cos_cache * settings.player.move_speed * dt
         self._move_with_collision(dx, dy, game_map)
         
-    def strafe_right(self, dt, game_map):
-        """Strafe right (perpendicular to facing direction) with anticipation"""
-        # Right is 90 degrees clockwise: (cos, sin) -> (-sin, cos)
-        dx = -self._sin_cache * self.move_speed * dt
-        dy = self._cos_cache * self.move_speed * dt
+    def strafe_right(self, dt: float, game_map: 'Map') -> None:
+        """Strafe right perpendicular to facing direction.
+        
+        Args:
+            dt: Delta time in seconds
+            game_map: The game map to check collisions against
+        """
+        dx = -self._sin_cache * settings.player.move_speed * dt
+        dy = self._cos_cache * settings.player.move_speed * dt
         self._move_with_collision(dx, dy, game_map)
         
-    def look_left(self, dt):
-        """Rotate player left"""
-        self.rotate(-self.rotation_speed * dt)
+    def look_left(self, dt: float) -> None:
+        """Rotate player left.
         
-    def look_right(self, dt):
-        """Rotate player right"""
-        self.rotate(self.rotation_speed * dt)
+        Args:
+            dt: Delta time in seconds
+        """
+        self.rotate(-settings.player.rotation_speed * dt)
+        
+    def look_right(self, dt: float) -> None:
+        """Rotate player right.
+        
+        Args:
+            dt: Delta time in seconds
+        """
+        self.rotate(settings.player.rotation_speed * dt)
     
-    def update_bobbing(self, dt):
-        """Update view bobbing for walking animation effect"""
+    def update_bobbing(self, dt: float) -> None:
+        """Update view bobbing for walking animation effect.
+        
+        Args:
+            dt: Delta time in seconds
+        """
         if self.is_moving:
-            # Update phase of the bobbing
-            self.bob_phase += self.bob_frequency * dt
-            # Keep phase in reasonable range to prevent overflow
+            self.bob_phase += settings.player.bob_frequency * dt
             if self.bob_phase > 2 * math.pi * 100:
                 self.bob_phase = 0
             
-            # Calculate vertical offset using sine wave
-            self.bob_offset_y = math.sin(self.bob_phase * 2 * math.pi) * self.bob_amplitude
+            self.bob_offset_y = (
+                math.sin(self.bob_phase * 2 * math.pi) * 
+                settings.player.bob_amplitude
+            )
         else:
-            # Smoothly return to neutral position when not moving
             if abs(self.bob_offset_y) > 0.1:
                 self.bob_offset_y *= 0.8
             else:
@@ -169,31 +228,47 @@ class Player:
 
 
 class Map:
-    """Tile-based map where each cell can be empty (0) or a wall (1+)"""
+    """Tile-based map where each cell can be empty (0) or a wall (1+)."""
     
-    def __init__(self, grid, player_start=(2.0, 2.0)):
-        self.grid = grid
-        self.width = len(grid[0])
-        self.height = len(grid)
-        self.tile_size = 64
-        self.player_start = player_start
+    def __init__(self, grid: List[List[int]], player_start: Tuple[float, float] = (2.0, 2.0)) -> None:
+        """Initialize the map.
+        
+        Args:
+            grid: 2D list representing the map tiles
+            player_start: Starting position for the player
+        """
+        self.grid: List[List[int]] = grid
+        self.width: int = len(grid[0])
+        self.height: int = len(grid)
+        self.tile_size: int = settings.map.tile_size
+        self.player_start: Tuple[float, float] = player_start
 
     @staticmethod
-    def load_from_file(filename):
-        """Load map from text file. 'P' marks player start, digits are tile types"""
-        grid = []
-        player_start = (2.0, 2.0)
+    def load_from_file(filename: str) -> 'Map':
+        """Load map from text file.
+        
+        Args:
+            filename: Path to the map file
+            
+        Returns:
+            Loaded Map instance
+            
+        Raises:
+            SystemExit: If map file is not found
+        """
+        grid: List[List[int]] = []
+        player_start: Tuple[float, float] = (2.0, 2.0)
+        
         try:
             with open(filename, 'r') as file:
                 for y, line in enumerate(file):
-                    row = []
+                    row: List[int] = []
                     for x, char in enumerate(line.strip()):
                         if char.isdigit():
                             row.append(int(char))
                         elif char.upper() == 'P':
-                            # Found player start position
                             player_start = (float(x), float(y))
-                            row.append(0)  # Treat player start as empty floor
+                            row.append(0)
                     if row:
                         grid.append(row)
             return Map(grid, player_start)
@@ -201,8 +276,16 @@ class Map:
             print(f"Error: map file '{filename}' not found.")
             sys.exit(1)
         
-    def is_wall(self, x, y):
-        """Check if given world coordinates contain a wall"""
+    def is_wall(self, x: float, y: float) -> bool:
+        """Check if given world coordinates contain a wall.
+        
+        Args:
+            x: X coordinate
+            y: Y coordinate
+            
+        Returns:
+            True if position contains a wall, False otherwise
+        """
         map_x = int(x)
         map_y = int(y)
         
@@ -211,8 +294,16 @@ class Map:
             
         return self.grid[map_y][map_x] > 0
         
-    def get_tile(self, x, y):
-        """Get tile type at given world coordinates"""
+    def get_tile(self, x: float, y: float) -> int:
+        """Get tile type at given world coordinates.
+        
+        Args:
+            x: X coordinate
+            y: Y coordinate
+            
+        Returns:
+            Tile type ID
+        """
         map_x = int(x)
         map_y = int(y)
         
@@ -222,128 +313,59 @@ class Map:
         return self.grid[map_y][map_x]
 
 
-def generate_texture(size=64, color1=(150, 150, 150), color2=(100, 100, 100)):
-    """Generate a simple checkerboard texture"""
-    surface = pygame.Surface((size, size))
-    surface.fill(color1)
-    # Draw a checker pattern
-    pygame.draw.rect(surface, color2, (0, 0, size//2, size//2))
-    pygame.draw.rect(surface, color2, (size//2, size//2, size//2, size//2))
-    return surface
-
 class Raycaster:
-    """Handles 3D rendering using raycasting technique"""
+    """Handles 3D rendering using raycasting technique."""
     
-    def __init__(self, screen_width, screen_height):
-        self.screen_width = screen_width
-        self.screen_height = screen_height
-        self.fov = 60  # Field of view in degrees
-        self.max_depth = 100.0  # Maximum ray distance
+    def __init__(self, screen_width: int, screen_height: int, asset_manager: AssetManager) -> None:
+        """Initialize the raycaster.
         
-        # PERFORMANCE SETTING:
-        # Texture mapping in Python is slow. We reduce resolution to keep FPS high.
-        # // 2 means half resolution (e.g., 800 rays for 1600px screen).
-        self.num_rays = screen_width // 6
-        self.ray_width = self.screen_width / self.num_rays
+        Args:
+            screen_width: Width of the screen in pixels
+            screen_height: Height of the screen in pixels
+            asset_manager: AssetManager instance for texture access
+        """
+        self.screen_width: int = screen_width
+        self.screen_height: int = screen_height
+        self.asset_manager: AssetManager = asset_manager
         
-        # Floor/Ceiling resolution scale factor
-        # Higher = more pixelated but much faster (4 = 1/16th the pixels, 93% less work)
-        self.floor_scale = 3
-        self.floor_width = screen_width // self.floor_scale
-        self.floor_height = screen_height // self.floor_scale
+        self.fov: float = settings.render.fov
+        self.max_depth: float = settings.render.max_depth
         
-        self.wall_buffer = []  # Cache for wall rendering
+        self.num_rays: int = screen_width // settings.render.ray_resolution_divisor
+        self.ray_width: float = self.screen_width / self.num_rays
         
-        # Initialize Textures
-        self.textures = {}
-        self.floor_texture = None
-        self.ceiling_texture = None
-        texture_dir = "textures"
+        self.floor_scale: int = settings.render.floor_scale
+        self.floor_width: int = screen_width // self.floor_scale
+        self.floor_height: int = screen_height // self.floor_scale
         
-        # Load textures from directory
-        if os.path.exists(texture_dir):
-            for filename in os.listdir(texture_dir):
-                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
-                    # Extract ID from filename (e.g. "Asset 1.png" -> 1, "wall2.png" -> 2)
-                    match = re.search(r'(\d+)', filename)
-                    if match:
-                        try:
-                            tex_id = int(match.group(1))
-                            full_path = os.path.join(texture_dir, filename)
-                            self.textures[tex_id] = pygame.image.load(full_path).convert()
-                            print(f"Loaded texture {tex_id} from {filename}")
-                        except pygame.error:
-                            print(f"Failed to load texture: {filename}")
-                    
-                    # Load floor texture
-                    if "floor" in filename.lower():
-                        try:
-                            full_path = os.path.join(texture_dir, filename)
-                            self.floor_texture = pygame.image.load(full_path).convert()
-                            print(f"Loaded floor texture from {filename}")
-                        except pygame.error:
-                            print(f"Failed to load floor texture: {filename}")
-                    
-                    # Load ceiling texture
-                    if "ceiling" in filename.lower():
-                        try:
-                            full_path = os.path.join(texture_dir, filename)
-                            self.ceiling_texture = pygame.image.load(full_path).convert()
-                            print(f"Loaded ceiling texture from {filename}")
-                        except pygame.error:
-                            print(f"Failed to load ceiling texture: {filename}")
-                            
-        # Fallback: Generate textures if they weren't loaded from files
-        # This ensures the game runs even if the texture folder is empty or files are missing
-        texture_colors = {
-            1: ((150, 150, 150), (100, 100, 100)),
-            2: ((150, 100, 100), (100, 50, 50)),   # Red tint
-            3: ((100, 150, 100), (50, 100, 50))    # Green tint
-        }
+        self.wall_buffer: List = []
         
-        # Ensure at least IDs 1-3 exist (used in map)
-        for i in range(1, 4):
-            if i not in self.textures:
-                c1, c2 = texture_colors.get(i, ((150, 150, 150), (100, 100, 100)))
-                self.textures[i] = generate_texture(64, c1, c2)
+    def cast_ray(
+        self, 
+        player: Player, 
+        game_map: Map, 
+        angle: float
+    ) -> Tuple[float, int, float, float, int]:
+        """Cast a single ray using DDA algorithm.
         
-        # Generate floor texture if not loaded
-        if self.floor_texture is None:
-            self.floor_texture = generate_texture(64, (80, 80, 80), (60, 60, 60))
-        
-        # Generate ceiling texture if not loaded  
-        if self.ceiling_texture is None:
-            self.ceiling_texture = generate_texture(64, (40, 40, 60), (30, 30, 50))
-        
-        # Convert textures to numpy arrays for fast pixel access
-        self.floor_array = pygame.surfarray.array3d(self.floor_texture)
-        self.ceiling_array = pygame.surfarray.array3d(self.ceiling_texture)
-                
-        # Default texture properties (assuming all textures share same size for simplicity)
-        # We use texture 1 as the reference for dimensions
-        if 1 in self.textures:
-            self.tex_width = self.textures[1].get_width()
-            self.tex_height = self.textures[1].get_height()
-        else:
-            # Fallback if somehow texture 1 is still missing (shouldn't happen with fallback code above)
-            self.tex_width = 64
-            self.tex_height = 64
-        
-    def cast_ray(self, player, game_map, angle):
-        """Cast a single ray using DDA (Digital Differential Analysis) algorithm"""
+        Args:
+            player: The player object
+            game_map: The game map
+            angle: Ray angle in degrees
+            
+        Returns:
+            Tuple of (distance, side, ray_dx, ray_dy, hit_value)
+        """
         rad = math.radians(angle)
         ray_dx = math.cos(rad)
         ray_dy = math.sin(rad)
         
-        # Player position
         x = player.x
         y = player.y
         
-        # Map position
         map_x = int(x)
         map_y = int(y)
         
-        # Length of ray from one x or y-side to next x or y-side
         try:
             delta_dist_x = abs(1 / ray_dx) if ray_dx != 0 else float('inf')
             delta_dist_y = abs(1 / ray_dy) if ray_dy != 0 else float('inf')
@@ -351,7 +373,6 @@ class Raycaster:
             delta_dist_x = float('inf')
             delta_dist_y = float('inf')
         
-        # Calculate step and initial side_dist
         if ray_dx < 0:
             step_x = -1
             side_dist_x = (x - map_x) * delta_dist_x
@@ -366,15 +387,13 @@ class Raycaster:
             step_y = 1
             side_dist_y = (map_y + 1.0 - y) * delta_dist_y
         
-        # Perform DDA
         hit = False
         hit_val = 0
-        side = 0  # 0 for x-side, 1 for y-side
+        side = 0
         max_iterations = 50
         iterations = 0
         
         while not hit and iterations < max_iterations:
-            # Jump to next map square in x or y direction
             if side_dist_x < side_dist_y:
                 side_dist_x += delta_dist_x
                 map_x += step_x
@@ -386,17 +405,21 @@ class Raycaster:
             
             iterations += 1
             
-            # Check if ray has hit a wall
             tile = game_map.get_tile(map_x, map_y)
             if tile > 0:
                 hit = True
                 hit_val = tile
         
-        # Calculate distance
         if side == 0:
-            distance = (map_x - x + (1 - step_x) / 2) / ray_dx if ray_dx != 0 else self.max_depth
+            distance = (
+                (map_x - x + (1 - step_x) / 2) / ray_dx 
+                if ray_dx != 0 else self.max_depth
+            )
         else:
-            distance = (map_y - y + (1 - step_y) / 2) / ray_dy if ray_dy != 0 else self.max_depth
+            distance = (
+                (map_y - y + (1 - step_y) / 2) / ray_dy 
+                if ray_dy != 0 else self.max_depth
+            )
         
         distance = abs(distance)
         
@@ -405,18 +428,33 @@ class Raycaster:
             
         return distance, side, ray_dx, ray_dy, hit_val
         
-    def render_floor_ceiling_vectorized(self, screen, player, game_map):
-        """Render floor and ceiling using vectorized NumPy operations for performance"""
+    def render_floor_ceiling_vectorized(
+        self, 
+        screen: pygame.Surface, 
+        player: Player, 
+        game_map: Map
+    ) -> None:
+        """Render floor and ceiling using vectorized NumPy operations.
         
+        Args:
+            screen: Pygame surface to render to
+            player: The player object
+            game_map: The game map
+        """
         half_fov_rad = math.radians(self.fov / 2)
         tan_half_fov = math.tan(half_fov_rad)
         aspect_ratio = self.screen_width / self.screen_height
         screen_half = self.screen_height / 2 + player.bob_offset_y
         
-        floor_tex_width = self.floor_texture.get_width()
-        floor_tex_height = self.floor_texture.get_height()
-        ceiling_tex_width = self.ceiling_texture.get_width()
-        ceiling_tex_height = self.ceiling_texture.get_height()
+        floor_texture = self.asset_manager.get_floor_texture()
+        ceiling_texture = self.asset_manager.get_ceiling_texture()
+        floor_array = self.asset_manager.get_floor_array()
+        ceiling_array = self.asset_manager.get_ceiling_array()
+        
+        floor_tex_width = floor_texture.get_width()
+        floor_tex_height = floor_texture.get_height()
+        ceiling_tex_width = ceiling_texture.get_width()
+        ceiling_tex_height = ceiling_texture.get_height()
         
         player_cos = math.cos(math.radians(player.rotation))
         player_sin = math.sin(math.radians(player.rotation))
@@ -449,9 +487,10 @@ class Raycaster:
         world_x = player.x + ray_dir_x * row_distance
         world_y = player.y + ray_dir_y * row_distance
         
-        fog_factor = np.clip(row_distance / 10.0, 0.0, 1.0)
-        floor_fog = 1.0 - fog_factor * 0.6
-        ceiling_fog = 1.0 - fog_factor * 0.7
+        fog_distance = settings.fog.base_fog_distance
+        fog_factor = np.clip(row_distance / fog_distance, 0.0, 1.0)
+        floor_fog = 1.0 - fog_factor * settings.fog.floor_fog_intensity
+        ceiling_fog = 1.0 - fog_factor * settings.fog.ceiling_fog_intensity
         
         floor_mask = p > epsilon
         ceiling_mask = p < -epsilon
@@ -460,7 +499,7 @@ class Raycaster:
             tex_x = (world_x * floor_tex_width).astype(np.int32) % floor_tex_width
             tex_y = (world_y * floor_tex_height).astype(np.int32) % floor_tex_height
             
-            colors = self.floor_array[tex_x[floor_mask], tex_y[floor_mask]]
+            colors = floor_array[tex_x[floor_mask], tex_y[floor_mask]]
             fog_values = floor_fog[floor_mask]
             colors_fogged = (colors * fog_values[:, np.newaxis]).astype(np.uint8)
             
@@ -472,7 +511,7 @@ class Raycaster:
             tex_x = (world_x * ceiling_tex_width).astype(np.int32) % ceiling_tex_width
             tex_y = (world_y * ceiling_tex_height).astype(np.int32) % ceiling_tex_height
             
-            colors = self.ceiling_array[tex_x[ceiling_mask], tex_y[ceiling_mask]]
+            colors = ceiling_array[tex_x[ceiling_mask], tex_y[ceiling_mask]]
             fog_values = ceiling_fog[ceiling_mask]
             colors_fogged = (colors * fog_values[:, np.newaxis]).astype(np.uint8)
             
@@ -482,12 +521,20 @@ class Raycaster:
 
         del buffer_pixels
         
-        scaled_surf = pygame.transform.scale(buffer_surf, (self.screen_width, self.screen_height))
+        scaled_surf = pygame.transform.scale(
+            buffer_surf, 
+            (self.screen_width, self.screen_height)
+        )
         screen.blit(scaled_surf, (0, 0))
         
-    def render_3d_view(self, screen, player, game_map):
-        """Render the complete 3D view"""
+    def render_3d_view(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
+        """Render the complete 3D view.
         
+        Args:
+            screen: Pygame surface to render to
+            player: The player object
+            game_map: The game map
+        """
         half_fov_rad = math.radians(self.fov / 2)
         tan_half_fov = math.tan(half_fov_rad)
         aspect_ratio = self.screen_width / self.screen_height
@@ -501,7 +548,9 @@ class Raycaster:
             angle_offset_deg = math.degrees(angle_offset_rad)
             
             ray_angle = player.rotation + angle_offset_deg
-            distance, side, ray_dx, ray_dy, hit_val = self.cast_ray(player, game_map, ray_angle)
+            distance, side, ray_dx, ray_dy, hit_val = self.cast_ray(
+                player, game_map, ray_angle
+            )
                         
             raw_distance = distance 
             distance *= math.cos(angle_offset_rad)
@@ -512,7 +561,7 @@ class Raycaster:
             wall_height = int(self.screen_height / distance)
             wall_top = int(screen_half - (wall_height / 2))
             
-            current_texture = self.textures.get(hit_val, self.textures[1])
+            current_texture = self.asset_manager.get_wall_texture(hit_val)
             cur_tex_width = current_texture.get_width()
             cur_tex_height = current_texture.get_height()
             
@@ -534,33 +583,45 @@ class Raycaster:
             render_width = int(self.ray_width) + 1 
             
             if wall_height > 0 and wall_height < 8000:
-                scaled_strip = pygame.transform.scale(tex_strip, (render_width, wall_height))
+                scaled_strip = pygame.transform.scale(
+                    tex_strip, 
+                    (render_width, wall_height)
+                )
                 
-                fog_intensity = min(1.0, distance / 10.0)
-                base_fog_alpha = int(fog_intensity * 0.6 * 255)
-                side_alpha = 80 if side == 1 else 0
+                fog_intensity = min(1.0, distance / settings.fog.base_fog_distance)
+                base_fog_alpha = int(
+                    fog_intensity * settings.fog.base_fog_intensity * 255
+                )
+                side_alpha = settings.fog.side_darkening_alpha if side == 1 else 0
                 total_alpha = min(255, base_fog_alpha + side_alpha)
                 
                 if total_alpha > 0:
                     fog_surface = pygame.Surface((render_width, wall_height))
                     fog_surface.set_alpha(total_alpha)
-                    fog_surface.fill((0, 0, 0))
+                    fog_surface.fill(settings.colors.black)
                     scaled_strip.blit(fog_surface, (0, 0))
 
                 screen.blit(scaled_strip, (ray_index * self.ray_width, wall_top))
 
-    def render_minimap(self, screen, player, game_map):
-        """Render 2D minimap overlay"""
-        minimap_size = 150
+    def render_minimap(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
+        """Render 2D minimap overlay.
+        
+        Args:
+            screen: Pygame surface to render to
+            player: The player object
+            game_map: The game map
+        """
+        minimap_size = settings.minimap.size
         minimap_scale = minimap_size / max(game_map.width, game_map.height)
-        minimap_x = screen.get_width() - minimap_size - 10
-        minimap_y = 10
+        minimap_x = screen.get_width() - minimap_size - settings.minimap.margin
+        minimap_y = settings.minimap.margin
         
-        # Draw minimap background
-        pygame.draw.rect(screen, (0, 0, 0), 
-                        (minimap_x, minimap_y, minimap_size, minimap_size))
+        pygame.draw.rect(
+            screen, 
+            settings.colors.minimap_background,
+            (minimap_x, minimap_y, minimap_size, minimap_size)
+        )
         
-        # Draw map tiles
         for y in range(game_map.height):
             for x in range(game_map.width):
                 tile = game_map.grid[y][x]
@@ -568,87 +629,87 @@ class Raycaster:
                     tile_x = minimap_x + x * minimap_scale
                     tile_y = minimap_y + y * minimap_scale
                     
-                    # Different colors for different walls
-                    color = (100, 100, 100)
-                    if tile == 2: color = (100, 50, 50)
-                    if tile == 3: color = (50, 100, 50)
+                    color = settings.colors.minimap_wall_default
+                    if tile == 2:
+                        color = settings.colors.minimap_wall_type2
+                    if tile == 3:
+                        color = settings.colors.minimap_wall_type3
                     
-                    pygame.draw.rect(screen, color,
-                                   (tile_x, tile_y, minimap_scale, minimap_scale))
+                    pygame.draw.rect(
+                        screen, 
+                        color,
+                        (tile_x, tile_y, minimap_scale, minimap_scale)
+                    )
         
-        # Draw player
         player_x = minimap_x + player.x * minimap_scale
         player_y = minimap_y + player.y * minimap_scale
-        pygame.draw.circle(screen, (255, 0, 0), (int(player_x), int(player_y)), 3)
+        pygame.draw.circle(
+            screen, 
+            settings.colors.minimap_player,
+            (int(player_x), int(player_y)), 
+            settings.minimap.player_dot_radius
+        )
         
-        # Draw player direction
         rad = math.radians(player.rotation)
-        end_x = player_x + math.cos(rad) * 10
-        end_y = player_y + math.sin(rad) * 10
-        pygame.draw.line(screen, (255, 0, 0), 
-                        (player_x, player_y), 
-                        (end_x, end_y), 2)
+        end_x = player_x + math.cos(rad) * settings.minimap.direction_line_length
+        end_y = player_y + math.sin(rad) * settings.minimap.direction_line_length
+        pygame.draw.line(
+            screen, 
+            settings.colors.minimap_player,
+            (player_x, player_y), 
+            (end_x, end_y), 
+            settings.minimap.direction_line_width
+        )
 
 
 class Game:
-    """Main game class handling initialization, game loop, and events"""
+    """Main game class handling initialization, game loop, and events."""
     
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the game."""
         pygame.init()
         
-        # Display settings
-        self.screen_width = 1600
-        self.screen_height = 900
-        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        pygame.display.set_caption("PyDoom")
+        self.screen_width: int = settings.display.width
+        self.screen_height: int = settings.display.height
+        self.screen: pygame.Surface = pygame.display.set_mode(
+            (self.screen_width, self.screen_height)
+        )
+        pygame.display.set_caption(settings.display.title)
         
-        # Clock for controlling frame rate
-        self.clock = pygame.time.Clock()
-        self.fps = 60
+        self.clock: pygame.time.Clock = pygame.time.Clock()
+        self.fps: int = settings.display.fps
         
-        # Game state
-        self.running = True
-        self.paused = False
+        self.running: bool = True
+        self.paused: bool = False
         
-        # Performance settings
-        self.show_fps = True
+        self.show_fps: bool = settings.show_fps
         
-        # Mouse control settings
-        self.last_mouse_pos = None
+        self.last_mouse_pos: Optional[Tuple[int, int]] = None
         
-        # Grab mouse input
         pygame.event.set_grab(True)
         pygame.mouse.set_visible(False)
         
-        # Colors
-        self.BLACK = (0, 0, 0)
-        self.WHITE = (255, 255, 255)
-        self.RED = (255, 0, 0)
-        self.GREEN = (0, 255, 0)
-        self.BLUE = (0, 0, 255)
+        self.game_map: Map = Map.load_from_file(settings.map.default_map_file)
         
-        # Create a simple map (1 = wall, 0 = empty)
-        self.game_map = Map.load_from_file("map.txt")
-    
-        
-        # Initialize player at the loaded start position
         start_x, start_y = self.game_map.player_start
-        self.player = Player(start_x, start_y, 0.0)
+        self.player: Player = Player(start_x, start_y, 0.0)
         
-        # Initialize raycaster
-        self.raycaster = Raycaster(self.screen_width, self.screen_height)
+        self.asset_manager: AssetManager = AssetManager()
+        self.raycaster: Raycaster = Raycaster(
+            self.screen_width, 
+            self.screen_height,
+            self.asset_manager
+        )
         
-        # Font for FPS display
-        self.font = pygame.font.Font(None, 36)
+        self.font: pygame.font.Font = pygame.font.Font(None, 36)
         
-        # Center mouse
         center_x = self.screen_width // 2
         center_y = self.screen_height // 2
         pygame.mouse.set_pos(center_x, center_y)
         self.last_mouse_pos = (center_x, center_y)
 
-    def handle_events(self):
-        """Handle all pygame events"""
+    def handle_events(self) -> None:
+        """Handle all pygame events."""
         for event in pygame.event.get():
             if event.type == QUIT:
                 self.running = False
@@ -661,8 +722,12 @@ class Game:
             elif event.type == MOUSEMOTION:
                 self.handle_mouse_motion(event)
                 
-    def handle_keydown(self, event):
-        """Handle key press events"""
+    def handle_keydown(self, event: pygame.event.Event) -> None:
+        """Handle key press events.
+        
+        Args:
+            event: The pygame key event
+        """
         if event.key == K_ESCAPE:
             self.running = False
         elif event.key == K_p:
@@ -673,132 +738,127 @@ class Game:
             else:
                 pygame.event.set_grab(True)
                 pygame.mouse.set_visible(False)
-                pygame.mouse.get_rel()  # Clear relative motion
+                pygame.mouse.get_rel()
 
-    def handle_keyup(self, event):
-        """Handle key release events"""
+    def handle_keyup(self, event: pygame.event.Event) -> None:
+        """Handle key release events.
+        
+        Args:
+            event: The pygame key event
+        """
         pass
         
-    def handle_mouse_click(self, event):
-        """Handle mouse click events"""
+    def handle_mouse_click(self, event: pygame.event.Event) -> None:
+        """Handle mouse click events.
+        
+        Args:
+            event: The pygame mouse event
+        """
         pass
         
-    def handle_mouse_motion(self, event):
-        """Handle mouse motion events"""
+    def handle_mouse_motion(self, event: pygame.event.Event) -> None:
+        """Handle mouse motion events.
+        
+        Args:
+            event: The pygame mouse event
+        """
         if not self.paused:
-            # Get mouse movement using relative motion
             dx, dy = pygame.mouse.get_rel()
             
-            # Apply mouse movement to player rotation (horizontal only)
             if dx != 0:
                 self.player.rotate_from_mouse(dx)
 
-
-    def handle_player_input(self, dt):
-        """Process continuous keyboard input for smooth movement"""
+    def handle_player_input(self, dt: float) -> None:
+        """Process continuous keyboard input for smooth movement.
+        
+        Args:
+            dt: Delta time in seconds
+        """
         keys = pygame.key.get_pressed()
         
-        # Initialize total movement vector
         total_dx = 0.0
         total_dy = 0.0
         
-        move_speed = self.player.move_speed * dt
+        move_speed = settings.player.move_speed * dt
         
-        # 1. Accumulate movement vectors based on keys
-        # Forward (W)
         if keys[K_w]:
             total_dx += self.player._cos_cache * move_speed
             total_dy += self.player._sin_cache * move_speed
             
-        # Backward (S)
         if keys[K_s]:
             total_dx += -self.player._cos_cache * move_speed
             total_dy += -self.player._sin_cache * move_speed
             
-        # Strafe Left (A)
         if keys[K_a]:
             total_dx += self.player._sin_cache * move_speed
             total_dy += -self.player._cos_cache * move_speed
             
-        # Strafe Right (D)
         if keys[K_d]:
             total_dx += -self.player._sin_cache * move_speed
             total_dy += self.player._cos_cache * move_speed
 
-        # Track if player is moving for view bobbing
         self.player.is_moving = (keys[K_w] or keys[K_s] or keys[K_a] or keys[K_d])
 
-        # 2. Normalize vector 
-        # Without this, moving diagonally (W+D) makes you move ~1.4x faster
         if self.player.is_moving:
-            # If we are moving diagonally (non-zero in both axes relative to player), 
-            # the magnitude will be greater than move_speed
             current_speed = math.sqrt(total_dx**2 + total_dy**2)
             if current_speed > move_speed:
                 scale = move_speed / current_speed
                 total_dx *= scale
                 total_dy *= scale
 
-        # 3. Apply ONE physics update with the combined vector
         if total_dx != 0 or total_dy != 0:
             self.player._move_with_collision(total_dx, total_dy, self.game_map)
             
-        # Rotation: Arrow keys (This is fine to keep separate as it doesn't affect X/Y collision)
         if keys[K_LEFT]:
             self.player.look_left(dt)
         if keys[K_RIGHT]:
             self.player.look_right(dt)
 
-    def update(self, dt):
-        """Update game logic"""
+    def update(self, dt: float) -> None:
+        """Update game logic.
+        
+        Args:
+            dt: Delta time in seconds
+        """
         if not self.paused:
             self.handle_player_input(dt)
-            
-            # Update view bobbing
             self.player.update_bobbing(dt)
             
-    def render(self):
-        """Render everything to the screen"""
-        # Clear screen
-        self.screen.fill(self.BLACK)
+    def render(self) -> None:
+        """Render everything to the screen."""
+        self.screen.fill(settings.colors.black)
         
-        # Render 3D view
         self.raycaster.render_3d_view(self.screen, self.player, self.game_map)
-        
-        # Render minimap
         self.raycaster.render_minimap(self.screen, self.player, self.game_map)
         
-        # Display FPS
         if self.show_fps:
-            fps_text = self.font.render(f"FPS: {int(self.clock.get_fps())}", True, self.GREEN)
+            fps_text = self.font.render(
+                f"FPS: {int(self.clock.get_fps())}", 
+                True, 
+                settings.colors.green
+            )
             self.screen.blit(fps_text, (10, 10))
         
-        # Update display
         pygame.display.flip()
         
-    def run(self):
-        """Main game loop"""
+    def run(self) -> None:
+        """Main game loop."""
         while self.running:
-            # Delta time in seconds
             dt = self.clock.tick(self.fps) / 1000.0
             
-            # Handle events
             self.handle_events()
-            
-            # Update game state
             self.update(dt)
-            
-            # Render
             self.render()
             
         self.quit()
         
-    def quit(self):
-        """Clean up and quit"""
+    def quit(self) -> None:
+        """Clean up and quit."""
         pygame.event.set_grab(False)
         pygame.mouse.set_visible(True)
         pygame.quit()
         sys.exit()
+
 
 if __name__ == "__main__":
     game = Game()

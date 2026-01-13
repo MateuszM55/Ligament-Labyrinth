@@ -21,7 +21,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="managers.py" />
     <Compile Include="PyDoom.py" />
+    <Compile Include="settings.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="map.txt" />

@@ -9,7 +9,7 @@ from pygame.locals import *
 
 from settings import settings
 from managers import AssetManager
-from numba_raycaster import cast_ray_numba, render_floor_ceiling_numba
+from numba_raycaster import cast_ray_numba, render_floor_ceiling_numba, render_walls_numba
 
 
 class Player:
@@ -423,82 +423,50 @@ class Raycaster:
             (self.screen_width, self.screen_height)
         )
         screen.blit(scaled_surf, (0, 0))
-        
-    def render_3d_view(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
-        """Render the complete 3D view.
+                  
+    def render_3d_view_numba(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
+        """Render the complete 3D view using Numba optimization for walls.
         
         Args:
             screen: Pygame surface to render to
             player: The player object
             game_map: The game map
         """
-        half_fov_rad = math.radians(self.fov / 2)
-        tan_half_fov = math.tan(half_fov_rad)
-        aspect_ratio = self.screen_width / self.screen_height
-        screen_half = self.screen_height / 2 + player.bob_offset_y
-        
+        # Render floor and ceiling first
         self.render_floor_ceiling_vectorized(screen, player, game_map)
         
-        for ray_index in range(self.num_rays):
-            screen_x = (2 * ray_index) / self.num_rays - 1
-            angle_offset_rad = math.atan(screen_x * tan_half_fov * aspect_ratio)
-            angle_offset_deg = math.degrees(angle_offset_rad)
-            
-            ray_angle = player.rotation + angle_offset_deg
-            distance, side, ray_dx, ray_dy, hit_val = self.cast_ray(
-                player, game_map, ray_angle
-            )
-                        
-            raw_distance = distance 
-            distance *= math.cos(angle_offset_rad)
-            
-            if distance < 0.01:
-                distance = 0.01
-                
-            wall_height = int(self.screen_height / distance)
-            wall_top = int(screen_half - (wall_height / 2))
-            
-            current_texture = self.asset_manager.get_wall_texture(hit_val)
-            cur_tex_width = current_texture.get_width()
-            cur_tex_height = current_texture.get_height()
-            
-            if side == 0:
-                wall_x = player.y + raw_distance * ray_dy
-            else:
-                wall_x = player.x + raw_distance * ray_dx
-            
-            wall_x -= math.floor(wall_x)
-            tex_x = int(wall_x * cur_tex_width)
-            
-            if side == 0 and ray_dx > 0:
-                tex_x = cur_tex_width - tex_x - 1
-            if side == 1 and ray_dy < 0:
-                tex_x = cur_tex_width - tex_x - 1
-                
-            tex_x = max(0, min(tex_x, cur_tex_width - 1))
-            tex_strip = current_texture.subsurface((tex_x, 0, 1, cur_tex_height))
-            render_width = int(self.ray_width) + 1 
-            
-            if wall_height > 0 and wall_height < 8000:
-                scaled_strip = pygame.transform.scale(
-                    tex_strip, 
-                    (render_width, wall_height)
-                )
-                
-                fog_intensity = min(1.0, distance / settings.fog.base_fog_distance)
-                base_fog_alpha = int(
-                    fog_intensity * settings.fog.base_fog_intensity * 255
-                )
-                side_alpha = settings.fog.side_darkening_alpha if side == 1 else 0
-                total_alpha = min(255, base_fog_alpha + side_alpha)
-                
-                if total_alpha > 0:
-                    fog_surface = pygame.Surface((render_width, wall_height))
-                    fog_surface.set_alpha(total_alpha)
-                    fog_surface.fill(settings.colors.black)
-                    scaled_strip.blit(fog_surface, (0, 0))
-
-                screen.blit(scaled_strip, (ray_index * self.ray_width, wall_top))
+        # Get pixel array for direct manipulation
+        screen_pixels = pygame.surfarray.pixels3d(screen)
+        
+        # Get texture arrays from asset manager
+        texture_arrays = self.asset_manager.get_wall_texture_arrays()
+        texture_map = self.asset_manager.get_texture_map()
+        
+        # Call numba-optimized wall rendering
+        render_walls_numba(
+            screen_pixels,
+            texture_arrays,
+            texture_map,
+            player.x,
+            player.y,
+            player.rotation,
+            game_map.grid_array,
+            game_map.width,
+            game_map.height,
+            self.screen_width,
+            self.screen_height,
+            self.fov,
+            self.max_depth,
+            self.num_rays,
+            self.ray_width,
+            player.bob_offset_y,
+            settings.fog.base_fog_distance,
+            settings.fog.base_fog_intensity,
+            settings.fog.side_darkening_alpha
+        )
+        
+        # Release the pixel array lock
+        del screen_pixels
 
     def render_minimap(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
         """Render 2D minimap overlay.
@@ -725,7 +693,8 @@ class Game:
         """Render everything to the screen."""
         self.screen.fill(settings.colors.black)
         
-        self.raycaster.render_3d_view(self.screen, self.player, self.game_map)
+        self.raycaster.render_3d_view_numba(self.screen, self.player, self.game_map)
+        
         self.raycaster.render_minimap(self.screen, self.player, self.game_map)
         
         if self.show_fps:

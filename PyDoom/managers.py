@@ -146,6 +146,9 @@ class AssetManager:
         
         if self.ceiling_texture is not None:
             self.ceiling_array = pygame.surfarray.array3d(self.ceiling_texture)
+        
+        # Prepare wall texture arrays for numba
+        self._prepare_wall_texture_arrays()
     
     def get_wall_texture(self, texture_id: int) -> pygame.Surface:
         """Get a wall texture by ID, falling back to texture 1 if not found.
@@ -189,3 +192,46 @@ class AssetManager:
             NumPy array of the ceiling texture
         """
         return self.ceiling_array
+    
+    def _prepare_wall_texture_arrays(self) -> None:
+        """Prepare wall textures as a single NumPy array for numba optimization."""
+        if not self.textures:
+            # Initialize with minimal arrays even if no textures loaded
+            self.wall_texture_arrays = np.zeros((1, self.tex_width, self.tex_height, 3), dtype=np.uint8)
+            self.texture_map = np.zeros(1, dtype=np.int32)
+            return
+        
+        # Find max texture ID
+        max_tex_id = max(self.textures.keys())
+        num_textures = max_tex_id + 1
+        
+        # Create array to hold all textures
+        self.wall_texture_arrays = np.zeros(
+            (num_textures, self.tex_width, self.tex_height, 3),
+            dtype=np.uint8
+        )
+        
+        # Create mapping from tile value to texture index
+        self.texture_map = np.zeros(num_textures, dtype=np.int32)
+        
+        # Convert each texture to array
+        for tex_id, texture in self.textures.items():
+            texture_array = pygame.surfarray.array3d(texture)
+            self.wall_texture_arrays[tex_id] = texture_array
+            self.texture_map[tex_id] = tex_id
+    
+    def get_wall_texture_arrays(self) -> np.ndarray:
+        """Get all wall textures as a single NumPy array.
+        
+        Returns:
+            NumPy array of shape (num_textures, tex_width, tex_height, 3)
+        """
+        return self.wall_texture_arrays
+    
+    def get_texture_map(self) -> np.ndarray:
+        """Get texture mapping array.
+        
+        Returns:
+            NumPy array mapping tile values to texture indices
+        """
+        return self.texture_map

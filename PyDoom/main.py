@@ -4,7 +4,6 @@ import sys
 import math
 import pygame
 from pygame.locals import *
-from typing import Optional, Tuple
 
 from settings import settings
 from world.map import Map
@@ -35,8 +34,6 @@ class Game:
         
         self.show_fps: bool = settings.show_fps
         
-        self.last_mouse_pos: Optional[Tuple[int, int]] = None
-        
         pygame.event.set_grab(True)
         pygame.mouse.set_visible(False)
         
@@ -53,11 +50,6 @@ class Game:
         )
         
         self.font: pygame.font.Font = pygame.font.Font(None, 36)
-        
-        center_x = self.screen_width // 2
-        center_y = self.screen_height // 2
-        pygame.mouse.set_pos(center_x, center_y)
-        self.last_mouse_pos = (center_x, center_y)
 
     def handle_events(self) -> None:
         """Handle all pygame events."""
@@ -66,10 +58,6 @@ class Game:
                 self.running = False
             elif event.type == KEYDOWN:
                 self.handle_keydown(event)
-            elif event.type == KEYUP:
-                self.handle_keyup(event)
-            elif event.type == MOUSEBUTTONDOWN:
-                self.handle_mouse_click(event)
             elif event.type == MOUSEMOTION:
                 self.handle_mouse_motion(event)
                 
@@ -99,13 +87,6 @@ class Game:
         """
         pass
         
-    def handle_mouse_click(self, event: pygame.event.Event) -> None:
-        """Handle mouse click events.
-        
-        Args:
-            event: The pygame mouse event
-        """
-        pass
         
     def handle_mouse_motion(self, event: pygame.event.Event) -> None:
         """Handle mouse motion events.

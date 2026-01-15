@@ -52,8 +52,6 @@ class Raycaster:
             player: The player object
             game_map: The game map
         """
-        floor_texture = self.asset_manager.get_floor_texture()
-        ceiling_texture = self.asset_manager.get_ceiling_texture()
         floor_array = self.asset_manager.get_floor_array()
         ceiling_array = self.asset_manager.get_ceiling_array()
         

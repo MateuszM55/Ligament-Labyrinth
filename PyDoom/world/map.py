@@ -20,7 +20,6 @@ class Map:
         self.grid: List[List[int]] = grid
         self.width: int = len(grid[0])
         self.height: int = len(grid)
-        self.tile_size: int = settings.map.tile_size
         self.player_start: Tuple[float, float] = player_start
         
         self.grid_array: np.ndarray = np.array(grid, dtype=np.int32)

@@ -26,7 +26,6 @@ class RenderSettings:
 class PlayerSettings:
     """Player movement and physics configuration."""
     move_speed: float = 3.0
-    rotation_speed: float = 120.0
     mouse_sensitivity: float = 0.2
     collision_radius: float = 0.2
     
@@ -37,7 +36,6 @@ class PlayerSettings:
 @dataclass(frozen=True)
 class MapSettings:
     """Map and tile configuration."""
-    tile_size: int = 64
     default_map_file: str = "map.txt"
 
 

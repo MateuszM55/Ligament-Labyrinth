@@ -15,8 +15,6 @@ class AssetManager:
     def __init__(self) -> None:
         """Initialize the asset manager and load all textures."""
         self.textures: Dict[int, pygame.Surface] = {}
-        self.floor_texture: Optional[pygame.Surface] = None
-        self.ceiling_texture: Optional[pygame.Surface] = None
         
         self.floor_array: Optional[np.ndarray] = None
         self.ceiling_array: Optional[np.ndarray] = None
@@ -72,16 +70,18 @@ class AssetManager:
                 except pygame.error as e:
                     print(f"Failed to load texture {filename}: {e}")
             
-            if "floor" in filename.lower() and self.floor_texture is None:
+            if "floor" in filename.lower() and self.floor_array is None:
                 try:
-                    self.floor_texture = pygame.image.load(full_path).convert()
+                    floor_surface = pygame.image.load(full_path).convert()
+                    self.floor_array = pygame.surfarray.array3d(floor_surface)
                     print(f"Loaded floor texture from {filename}")
                 except pygame.error as e:
                     print(f"Failed to load floor texture {filename}: {e}")
             
-            if "ceiling" in filename.lower() and self.ceiling_texture is None:
+            if "ceiling" in filename.lower() and self.ceiling_array is None:
                 try:
-                    self.ceiling_texture = pygame.image.load(full_path).convert()
+                    ceiling_surface = pygame.image.load(full_path).convert()
+                    self.ceiling_array = pygame.surfarray.array3d(ceiling_surface)
                     print(f"Loaded ceiling texture from {filename}")
                 except pygame.error as e:
                     print(f"Failed to load ceiling texture {filename}: {e}")
@@ -108,20 +108,22 @@ class AssetManager:
         """Generate fallback floor and ceiling textures if not loaded."""
         texture_size = settings.assets.texture_size
         
-        if self.floor_texture is None:
-            self.floor_texture = self._generate_checkerboard_texture(
+        if self.floor_array is None:
+            floor_surface = self._generate_checkerboard_texture(
                 texture_size,
                 settings.colors.floor_primary,
                 settings.colors.floor_secondary
             )
+            self.floor_array = pygame.surfarray.array3d(floor_surface)
             print("Generated fallback floor texture")
         
-        if self.ceiling_texture is None:
-            self.ceiling_texture = self._generate_checkerboard_texture(
+        if self.ceiling_array is None:
+            ceiling_surface = self._generate_checkerboard_texture(
                 texture_size,
                 settings.colors.ceiling_primary,
                 settings.colors.ceiling_secondary
             )
+            self.ceiling_array = pygame.surfarray.array3d(ceiling_surface)
             print("Generated fallback ceiling texture")
     
     def _load_all_textures(self) -> None:
@@ -135,41 +137,8 @@ class AssetManager:
             self.tex_height = self.textures[1].get_height()
     
     def _convert_textures_to_arrays(self) -> None:
-        """Convert floor and ceiling textures to NumPy arrays for fast access."""
-        if self.floor_texture is not None:
-            self.floor_array = pygame.surfarray.array3d(self.floor_texture)
-        
-        if self.ceiling_texture is not None:
-            self.ceiling_array = pygame.surfarray.array3d(self.ceiling_texture)
-        
+        """Convert wall textures to NumPy arrays for fast access."""
         self._prepare_wall_texture_arrays()
-    
-    def get_wall_texture(self, texture_id: int) -> pygame.Surface:
-        """Get a wall texture by ID, falling back to texture 1 if not found.
-        
-        Args:
-            texture_id: The texture ID to retrieve
-            
-        Returns:
-            The requested texture surface, or texture 1 as fallback
-        """
-        return self.textures.get(texture_id, self.textures.get(1))
-    
-    def get_floor_texture(self) -> pygame.Surface:
-        """Get the floor texture surface.
-        
-        Returns:
-            The floor texture surface
-        """
-        return self.floor_texture
-    
-    def get_ceiling_texture(self) -> pygame.Surface:
-        """Get the ceiling texture surface.
-        
-        Returns:
-            The ceiling texture surface
-        """
-        return self.ceiling_texture
     
     def get_floor_array(self) -> np.ndarray:
         """Get the floor texture as a NumPy array for fast pixel access.

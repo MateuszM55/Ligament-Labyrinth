@@ -110,16 +110,6 @@ class Player:
         self._cos_cache = math.cos(rad)
         self._sin_cache = math.sin(rad)
         
-    def move(self, dx: float, dy: float) -> None:
-        """Move player by delta amounts.
-        
-        Args:
-            dx: Change in x position
-            dy: Change in y position
-        """
-        self.x += float(dx)
-        self.y += float(dy)
-        
     def rotate(self, degrees: float) -> None:
         """Rotate player by degrees.
         
@@ -136,50 +126,6 @@ class Player:
             dx: Mouse movement delta
         """
         self.rotate(dx * settings.player.mouse_sensitivity)
-        
-    def move_forward(self, dt: float, game_map: 'Map') -> None:
-        """Move player forward in the direction they're facing.
-        
-        Args:
-            dt: Delta time in seconds
-            game_map: The game map to check collisions against
-        """
-        dx = self._cos_cache * settings.player.move_speed * dt
-        dy = self._sin_cache * settings.player.move_speed * dt
-        self._move_with_collision(dx, dy, game_map)
-        
-    def move_backward(self, dt: float, game_map: 'Map') -> None:
-        """Move player backward.
-        
-        Args:
-            dt: Delta time in seconds
-            game_map: The game map to check collisions against
-        """
-        dx = -self._cos_cache * settings.player.move_speed * dt
-        dy = -self._sin_cache * settings.player.move_speed * dt
-        self._move_with_collision(dx, dy, game_map)
-        
-    def strafe_left(self, dt: float, game_map: 'Map') -> None:
-        """Strafe left perpendicular to facing direction.
-        
-        Args:
-            dt: Delta time in seconds
-            game_map: The game map to check collisions against
-        """
-        dx = self._sin_cache * settings.player.move_speed * dt
-        dy = -self._cos_cache * settings.player.move_speed * dt
-        self._move_with_collision(dx, dy, game_map)
-        
-    def strafe_right(self, dt: float, game_map: 'Map') -> None:
-        """Strafe right perpendicular to facing direction.
-        
-        Args:
-            dt: Delta time in seconds
-            game_map: The game map to check collisions against
-        """
-        dx = -self._sin_cache * settings.player.move_speed * dt
-        dy = self._cos_cache * settings.player.move_speed * dt
-        self._move_with_collision(dx, dy, game_map)
             
     def update_bobbing(self, dt: float) -> None:
         """Update view bobbing for walking animation effect.

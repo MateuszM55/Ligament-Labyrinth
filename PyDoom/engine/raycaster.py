@@ -3,14 +3,12 @@
 import math
 import pygame
 import numpy as np
-from typing import List, Tuple
 
 from settings import settings
 from engine.assets import AssetManager
 from world.player import Player
 from world.map import Map
 from engine.numba_kernels import (
-    cast_ray_numba, 
     render_floor_ceiling_numba, 
     render_walls_numba
 )
@@ -40,36 +38,6 @@ class Raycaster:
         self.floor_scale: int = settings.render.floor_and_ceiling_scale
         self.floor_width: int = screen_width // self.floor_scale
         self.floor_height: int = screen_height // self.floor_scale
-        
-        self.wall_buffer: List = []
-        
-    def cast_ray(
-        self, 
-        player: Player, 
-        game_map: Map, 
-        angle: float
-    ) -> Tuple[float, int, float, float, int]:
-        """Cast a single ray using DDA algorithm (calls Numba-optimized version).
-        
-        Args:
-            player: The player object
-            game_map: The game map
-            angle: Ray angle in degrees
-            
-        Returns:
-            Tuple of (distance, side, ray_dx, ray_dy, hit_value)
-        """
-        angle_rad = math.radians(angle)
-        distance, side, ray_dx, ray_dy, hit_val = cast_ray_numba(
-            player.x,
-            player.y,
-            angle_rad,
-            game_map.grid_array,
-            game_map.width,
-            game_map.height,
-            self.max_depth
-        )
-        return distance, int(side), ray_dx, ray_dy, int(hit_val)
         
     def render_floor_ceiling_vectorized(
         self, 

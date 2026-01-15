@@ -75,21 +75,3 @@ class Map:
             return True
             
         return self.grid[map_y][map_x] > 0
-        
-    def get_tile(self, x: float, y: float) -> int:
-        """Get tile type at given world coordinates.
-        
-        Args:
-            x: X coordinate
-            y: Y coordinate
-            
-        Returns:
-            Tile type ID
-        """
-        map_x = int(x)
-        map_y = int(y)
-        
-        if map_x < 0 or map_x >= self.width or map_y < 0 or map_y >= self.height:
-            return 1
-            
-        return self.grid[map_y][map_x]

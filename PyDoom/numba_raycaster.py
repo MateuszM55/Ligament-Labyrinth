@@ -238,67 +238,6 @@ def render_floor_ceiling_numba(
 
 
 @numba.njit(fastmath=True)
-def cast_all_rays_numba(
-    player_x: float,
-    player_y: float,
-    player_rotation_deg: float,
-    map_grid: np.ndarray,
-    map_width: int,
-    map_height: int,
-    max_depth: float,
-    num_rays: int,
-    fov: float,
-    screen_width: int,
-    screen_height: int
-) -> np.ndarray:
-    """Cast all rays for the current frame (Numba optimized).
-    
-    Args:
-        player_x: Player X position
-        player_y: Player Y position
-        player_rotation_deg: Player rotation in degrees
-        map_grid: 2D NumPy array of map tiles
-        map_width: Width of the map
-        map_height: Height of the map
-        max_depth: Maximum ray distance
-        num_rays: Number of rays to cast
-        fov: Field of view in degrees
-        screen_width: Screen width in pixels
-        screen_height: Screen height in pixels
-        
-    Returns:
-        NumPy array of shape (num_rays, 5) containing:
-        [distance, side, ray_dx, ray_dy, hit_value] for each ray
-    """
-    half_fov_rad = math.radians(fov / 2.0)
-    tan_half_fov = math.tan(half_fov_rad)
-    aspect_ratio = screen_width / screen_height
-    
-    ray_data = np.zeros((num_rays, 5), dtype=np.float32)
-    
-    for ray_index in range(num_rays):
-        screen_x = (2.0 * ray_index) / num_rays - 1.0
-        angle_offset_rad = math.atan(screen_x * tan_half_fov * aspect_ratio)
-        angle_offset_deg = math.degrees(angle_offset_rad)
-        
-        ray_angle_deg = player_rotation_deg + angle_offset_deg
-        ray_angle_rad = math.radians(ray_angle_deg)
-        
-        distance, side, ray_dx, ray_dy, hit_val = cast_ray_numba(
-            player_x, player_y, ray_angle_rad,
-            map_grid, map_width, map_height, max_depth
-        )
-        
-        ray_data[ray_index, 0] = distance
-        ray_data[ray_index, 1] = float(side)
-        ray_data[ray_index, 2] = ray_dx
-        ray_data[ray_index, 3] = ray_dy
-        ray_data[ray_index, 4] = float(hit_val)
-    
-    return ray_data
-
-
-@numba.njit(fastmath=True)
 def render_walls_numba(
     screen_pixels: np.ndarray,
     texture_arrays: np.ndarray,

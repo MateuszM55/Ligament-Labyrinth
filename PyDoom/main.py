@@ -159,12 +159,7 @@ class Game:
 
         if total_dx != 0 or total_dy != 0:
             self.player._move_with_collision(total_dx, total_dy, self.game_map)
-            
-        if keys[K_LEFT]:
-            self.player.look_left(dt)
-        if keys[K_RIGHT]:
-            self.player.look_right(dt)
-
+           
     def update(self, dt: float) -> None:
         """Update game logic.
         

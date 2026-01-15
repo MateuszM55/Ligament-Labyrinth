@@ -180,23 +180,7 @@ class Player:
         dx = -self._sin_cache * settings.player.move_speed * dt
         dy = self._cos_cache * settings.player.move_speed * dt
         self._move_with_collision(dx, dy, game_map)
-        
-    def look_left(self, dt: float) -> None:
-        """Rotate player left.
-        
-        Args:
-            dt: Delta time in seconds
-        """
-        self.rotate(-settings.player.rotation_speed * dt)
-        
-    def look_right(self, dt: float) -> None:
-        """Rotate player right.
-        
-        Args:
-            dt: Delta time in seconds
-        """
-        self.rotate(settings.player.rotation_speed * dt)
-    
+            
     def update_bobbing(self, dt: float) -> None:
         """Update view bobbing for walking animation effect.
         

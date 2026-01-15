@@ -335,10 +335,10 @@ class Raycaster:
         self.fov: float = settings.render.fov
         self.max_depth: float = settings.render.max_depth
         
-        self.num_rays: int = screen_width // settings.render.ray_resolution_divisor
+        self.num_rays: int = screen_width // settings.render.wall_ray_resolution_divisor
         self.ray_width: float = self.screen_width / self.num_rays
         
-        self.floor_scale: int = settings.render.floor_scale
+        self.floor_scale: int = settings.render.floor_and_ceiling_scale
         self.floor_width: int = screen_width // self.floor_scale
         self.floor_height: int = screen_height // self.floor_scale
         

@@ -9,6 +9,7 @@ from pygame.locals import *
 
 from settings import settings
 from managers import AssetManager
+from numba_raycaster import cast_ray_numba, render_floor_ceiling_numba
 
 
 class Player:
@@ -242,6 +243,9 @@ class Map:
         self.height: int = len(grid)
         self.tile_size: int = settings.map.tile_size
         self.player_start: Tuple[float, float] = player_start
+        
+        # Create NumPy array for Numba-optimized functions
+        self.grid_array: np.ndarray = np.array(grid, dtype=np.int32)
 
     @staticmethod
     def load_from_file(filename: str) -> 'Map':
@@ -346,7 +350,7 @@ class Raycaster:
         game_map: Map, 
         angle: float
     ) -> Tuple[float, int, float, float, int]:
-        """Cast a single ray using DDA algorithm.
+        """Cast a single ray using DDA algorithm (calls Numba-optimized version).
         
         Args:
             player: The player object
@@ -356,77 +360,17 @@ class Raycaster:
         Returns:
             Tuple of (distance, side, ray_dx, ray_dy, hit_value)
         """
-        rad = math.radians(angle)
-        ray_dx = math.cos(rad)
-        ray_dy = math.sin(rad)
-        
-        x = player.x
-        y = player.y
-        
-        map_x = int(x)
-        map_y = int(y)
-        
-        try:
-            delta_dist_x = abs(1 / ray_dx) if ray_dx != 0 else float('inf')
-            delta_dist_y = abs(1 / ray_dy) if ray_dy != 0 else float('inf')
-        except ZeroDivisionError:
-            delta_dist_x = float('inf')
-            delta_dist_y = float('inf')
-        
-        if ray_dx < 0:
-            step_x = -1
-            side_dist_x = (x - map_x) * delta_dist_x
-        else:
-            step_x = 1
-            side_dist_x = (map_x + 1.0 - x) * delta_dist_x
-            
-        if ray_dy < 0:
-            step_y = -1
-            side_dist_y = (y - map_y) * delta_dist_y
-        else:
-            step_y = 1
-            side_dist_y = (map_y + 1.0 - y) * delta_dist_y
-        
-        hit = False
-        hit_val = 0
-        side = 0
-        max_iterations = 50
-        iterations = 0
-        
-        while not hit and iterations < max_iterations:
-            if side_dist_x < side_dist_y:
-                side_dist_x += delta_dist_x
-                map_x += step_x
-                side = 0
-            else:
-                side_dist_y += delta_dist_y
-                map_y += step_y
-                side = 1
-            
-            iterations += 1
-            
-            tile = game_map.get_tile(map_x, map_y)
-            if tile > 0:
-                hit = True
-                hit_val = tile
-        
-        if side == 0:
-            distance = (
-                (map_x - x + (1 - step_x) / 2) / ray_dx 
-                if ray_dx != 0 else self.max_depth
-            )
-        else:
-            distance = (
-                (map_y - y + (1 - step_y) / 2) / ray_dy 
-                if ray_dy != 0 else self.max_depth
-            )
-        
-        distance = abs(distance)
-        
-        if distance > self.max_depth or distance < 0:
-            distance = self.max_depth
-            
-        return distance, side, ray_dx, ray_dy, hit_val
+        angle_rad = math.radians(angle)
+        distance, side, ray_dx, ray_dy, hit_val = cast_ray_numba(
+            player.x,
+            player.y,
+            angle_rad,
+            game_map.grid_array,
+            game_map.width,
+            game_map.height,
+            self.max_depth
+        )
+        return distance, int(side), ray_dx, ray_dy, int(hit_val)
         
     def render_floor_ceiling_vectorized(
         self, 
@@ -434,93 +378,46 @@ class Raycaster:
         player: Player, 
         game_map: Map
     ) -> None:
-        """Render floor and ceiling using vectorized NumPy operations.
+        """Render floor and ceiling using Numba-optimized operations.
         
         Args:
             screen: Pygame surface to render to
             player: The player object
             game_map: The game map
         """
-        half_fov_rad = math.radians(self.fov / 2)
-        tan_half_fov = math.tan(half_fov_rad)
-        aspect_ratio = self.screen_width / self.screen_height
-        screen_half = self.screen_height / 2 + player.bob_offset_y
-        
         floor_texture = self.asset_manager.get_floor_texture()
         ceiling_texture = self.asset_manager.get_ceiling_texture()
         floor_array = self.asset_manager.get_floor_array()
         ceiling_array = self.asset_manager.get_ceiling_array()
         
-        floor_tex_width = floor_texture.get_width()
-        floor_tex_height = floor_texture.get_height()
-        ceiling_tex_width = ceiling_texture.get_width()
-        ceiling_tex_height = ceiling_texture.get_height()
-        
-        player_cos = math.cos(math.radians(player.rotation))
-        player_sin = math.sin(math.radians(player.rotation))
-        
-        plane_x = -player_sin * tan_half_fov * aspect_ratio
-        plane_y = player_cos * tan_half_fov * aspect_ratio
-        
+        # Create buffer surface and get pixel array
         buffer_surf = pygame.Surface((self.floor_width, self.floor_height))
         buffer_pixels = pygame.surfarray.pixels3d(buffer_surf)
         
-        x_coords, y_coords = np.meshgrid(
-            np.arange(self.floor_width, dtype=np.float32),
-            np.arange(self.floor_height, dtype=np.float32),
-            indexing='xy'
+        # Call Numba-optimized function
+        render_floor_ceiling_numba(
+            buffer_pixels,
+            floor_array,
+            ceiling_array,
+            self.floor_width,
+            self.floor_height,
+            self.floor_scale,
+            self.screen_width,
+            self.screen_height,
+            player.x,
+            player.y,
+            math.radians(player.rotation),
+            math.radians(self.fov),
+            player.bob_offset_y,
+            settings.fog.floor_fog_intensity,
+            settings.fog.ceiling_fog_intensity,
+            settings.fog.base_fog_distance
         )
         
-        screen_y_coords = y_coords * self.floor_scale
-        p = screen_y_coords - screen_half
-        
-        epsilon = 1.0
-        p_safe = np.where(np.abs(p) < epsilon, np.sign(p) * epsilon, p)
-        
-        pos_z = 0.5 * self.screen_height
-        row_distance = pos_z / np.abs(p_safe)
-        
-        screen_x_norm = (2.0 * x_coords / self.floor_width) - 1.0
-        ray_dir_x = player_cos + plane_x * screen_x_norm
-        ray_dir_y = player_sin + plane_y * screen_x_norm
-        
-        world_x = player.x + ray_dir_x * row_distance
-        world_y = player.y + ray_dir_y * row_distance
-        
-        fog_distance = settings.fog.base_fog_distance
-        fog_factor = np.clip(row_distance / fog_distance, 0.0, 1.0)
-        floor_fog = 1.0 - fog_factor * settings.fog.floor_fog_intensity
-        ceiling_fog = 1.0 - fog_factor * settings.fog.ceiling_fog_intensity
-        
-        floor_mask = p > epsilon
-        ceiling_mask = p < -epsilon
-        
-        if np.any(floor_mask):
-            tex_x = (world_x * floor_tex_width).astype(np.int32) % floor_tex_width
-            tex_y = (world_y * floor_tex_height).astype(np.int32) % floor_tex_height
-            
-            colors = floor_array[tex_x[floor_mask], tex_y[floor_mask]]
-            fog_values = floor_fog[floor_mask]
-            colors_fogged = (colors * fog_values[:, np.newaxis]).astype(np.uint8)
-            
-            x_indices = x_coords[floor_mask].astype(np.int32)
-            y_indices = y_coords[floor_mask].astype(np.int32)
-            buffer_pixels[x_indices, y_indices] = colors_fogged
-
-        if np.any(ceiling_mask):
-            tex_x = (world_x * ceiling_tex_width).astype(np.int32) % ceiling_tex_width
-            tex_y = (world_y * ceiling_tex_height).astype(np.int32) % ceiling_tex_height
-            
-            colors = ceiling_array[tex_x[ceiling_mask], tex_y[ceiling_mask]]
-            fog_values = ceiling_fog[ceiling_mask]
-            colors_fogged = (colors * fog_values[:, np.newaxis]).astype(np.uint8)
-            
-            x_indices = x_coords[ceiling_mask].astype(np.int32)
-            y_indices = y_coords[ceiling_mask].astype(np.int32)
-            buffer_pixels[x_indices, y_indices] = colors_fogged
-
+        # Release the pixel array lock
         del buffer_pixels
         
+        # Scale and blit to screen
         scaled_surf = pygame.transform.scale(
             buffer_surf, 
             (self.screen_width, self.screen_height)

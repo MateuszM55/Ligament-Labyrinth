@@ -9,17 +9,17 @@ class DisplaySettings:
     """Display and screen configuration."""
     width: int = 1600
     height: int = 900
-    fps: int = 60
+    fps: int = 144
     title: str = "PyDoom"
 
 
 @dataclass(frozen=True)
 class RenderSettings:
     """Raycasting and rendering configuration."""
-    fov: float = 60.0
+    fov: float = 70.0
     max_depth: float = 100.0
-    ray_resolution_divisor: int = 6
-    floor_scale: int = 3
+    ray_resolution_divisor: int = 2
+    floor_scale: int = 2
 
 
 @dataclass(frozen=True)

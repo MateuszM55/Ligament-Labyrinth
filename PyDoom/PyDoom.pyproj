@@ -22,11 +22,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="managers.py" />
+    <Compile Include="numba_raycaster.py" />
     <Compile Include="PyDoom.py" />
     <Compile Include="settings.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="map.txt" />
+    <Content Include="requirements.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

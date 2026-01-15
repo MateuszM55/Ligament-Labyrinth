@@ -247,7 +247,8 @@ def cast_all_rays_numba(
     max_depth: float,
     num_rays: int,
     fov: float,
-    screen_width: int
+    screen_width: int,
+    screen_height: int
 ) -> np.ndarray:
     """Cast all rays for the current frame (Numba optimized).
     
@@ -262,6 +263,7 @@ def cast_all_rays_numba(
         num_rays: Number of rays to cast
         fov: Field of view in degrees
         screen_width: Screen width in pixels
+        screen_height: Screen height in pixels
         
     Returns:
         NumPy array of shape (num_rays, 5) containing:
@@ -269,7 +271,7 @@ def cast_all_rays_numba(
     """
     half_fov_rad = math.radians(fov / 2.0)
     tan_half_fov = math.tan(half_fov_rad)
-    aspect_ratio = screen_width / 900.0  # Assuming default height
+    aspect_ratio = screen_width / screen_height
     
     ray_data = np.zeros((num_rays, 5), dtype=np.float32)
     

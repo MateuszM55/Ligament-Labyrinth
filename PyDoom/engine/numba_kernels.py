@@ -321,9 +321,9 @@ def render_walls_numba(
         side_alpha = side_darkening_alpha / 255.0 if side == 1 else 0.0
         total_alpha = min(1.0, base_fog_alpha + side_alpha)
         
-        render_width = int(ray_width) + 1
         x_start = int(ray_index * ray_width)
-        x_end = min(x_start + render_width, screen_width)
+        x_end = int((ray_index + 1) * ray_width)
+        x_end = min(x_end, screen_width)
         
         if wall_height > 0 and wall_height < 8000:
             for screen_x_pos in range(x_start, x_end):

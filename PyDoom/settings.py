@@ -29,7 +29,6 @@ class PlayerSettings:
     rotation_speed: float = 120.0
     mouse_sensitivity: float = 0.2
     collision_radius: float = 0.2
-    anticipation_frames: int =0
     
     bob_amplitude: float = 5.0
     bob_frequency: float = 1.0

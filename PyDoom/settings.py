@@ -7,8 +7,8 @@ from typing import Tuple
 @dataclass(frozen=True)
 class DisplaySettings:
     """Display and screen configuration."""
-    width: int = 1600
-    height: int = 900
+    width: int = 854
+    height: int = 480
     fps: int = 144
     title: str = "PyDoom"
 
@@ -18,8 +18,8 @@ class RenderSettings:
     """Raycasting and rendering configuration."""
     fov: float = 70.0
     max_depth: float = 100.0
-    ray_resolution_divisor: int = 2
-    floor_scale: int = 2
+    ray_resolution_divisor: int = 1
+    floor_scale: int = 1
 
 
 @dataclass(frozen=True)

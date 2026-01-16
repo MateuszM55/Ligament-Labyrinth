@@ -403,3 +403,110 @@ def render_walls_numba(
                     screen_pixels[screen_x_pos, screen_y_pos, 0] = r
                     screen_pixels[screen_x_pos, screen_y_pos, 1] = g
                     screen_pixels[screen_x_pos, screen_y_pos, 2] = b
+
+
+@numba.njit(fastmath=True)
+def process_sprites_numba(
+    sprite_data: np.ndarray,
+    player_x: float,
+    player_y: float,
+    player_rotation_deg: float,
+    fov: float,
+    screen_width: int,
+    screen_height: int,
+    max_depth: float,
+    wall_height_factor: float,
+    bob_offset_y: float,
+    enable_inverse_square: bool,
+    light_intensity: float,
+    ambient_light: float
+) -> np.ndarray:
+    """Process sprite rendering with Numba optimization.
+    
+    Args:
+        sprite_data: Array of shape (N, 3) with [x, y, texture_id] for each sprite
+        player_x: Player X position
+        player_y: Player Y position
+        player_rotation_deg: Player rotation in degrees
+        fov: Field of view in degrees
+        screen_width: Screen width in pixels
+        screen_height: Screen height in pixels
+        max_depth: Maximum render distance
+        wall_height_factor: Multiplier for sprite height calculation
+        bob_offset_y: View bobbing offset
+        enable_inverse_square: Use inverse square law for lighting
+        light_intensity: Base light power
+        ambient_light: Minimum light level (0-1)
+        
+    Returns:
+        Array of shape (M, 6) with [screen_x, sprite_height, sprite_width, distance, texture_id, light_factor]
+        sorted by distance (farthest first), where M <= N (after culling)
+    """
+    num_sprites = sprite_data.shape[0]
+    if num_sprites == 0:
+        return np.empty((0, 6), dtype=np.float32)
+    
+    player_rad = math.radians(player_rotation_deg)
+    player_cos = math.cos(player_rad)
+    player_sin = math.sin(player_rad)
+    
+    half_fov = math.radians(fov / 2.0)
+    tan_half_fov = math.tan(half_fov)
+    aspect_ratio = screen_width / screen_height
+    
+    visible_sprites = []
+    
+    for i in range(num_sprites):
+        sprite_x_world = sprite_data[i, 0]
+        sprite_y_world = sprite_data[i, 1]
+        texture_id = sprite_data[i, 2]
+        
+        dx = sprite_x_world - player_x
+        dy = sprite_y_world - player_y
+        
+        distance = math.sqrt(dx * dx + dy * dy)
+        
+        if distance < 0.1 or distance > max_depth:
+            continue
+        
+        sprite_y = dx * player_cos + dy * player_sin
+        sprite_x = dy * player_cos - dx * player_sin
+        
+        if sprite_y <= 0.1:
+            continue
+        
+        projection_plane_x = (sprite_x / sprite_y) / (tan_half_fov * aspect_ratio)
+        screen_x = (screen_width / 2.0) * (1.0 + projection_plane_x)
+        
+        sprite_height = (screen_height / sprite_y) * wall_height_factor
+        sprite_width = sprite_height
+        
+        if screen_x + sprite_width / 2 < 0 or screen_x - sprite_width / 2 > screen_width:
+            continue
+        
+        if sprite_height > 0 and sprite_height < 10000:
+            light_factor = 1.0
+            if enable_inverse_square:
+                light_factor = min(1.0, light_intensity / (distance * distance + 0.1))
+                light_factor = max(ambient_light, light_factor)
+            
+            visible_sprites.append((distance, screen_x, sprite_height, sprite_width, texture_id, light_factor))
+    
+    if len(visible_sprites) == 0:
+        return np.empty((0, 6), dtype=np.float32)
+    
+    visible_sprites_array = np.array(visible_sprites, dtype=np.float32)
+    
+    indices = np.argsort(-visible_sprites_array[:, 0])
+    sorted_sprites = visible_sprites_array[indices]
+    
+    result = np.empty((len(sorted_sprites), 6), dtype=np.float32)
+    for i in range(len(sorted_sprites)):
+        result[i, 0] = sorted_sprites[i, 1]
+        result[i, 1] = sorted_sprites[i, 2]
+        result[i, 2] = sorted_sprites[i, 3]
+        result[i, 3] = sorted_sprites[i, 0]
+        result[i, 4] = sorted_sprites[i, 4]
+        result[i, 5] = sorted_sprites[i, 5]
+    
+    return result

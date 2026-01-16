@@ -10,7 +10,8 @@ from world.player import Player
 from world.map import Map
 from engine.numba_kernels import (
     render_floor_ceiling_numba, 
-    render_walls_numba
+    render_walls_numba,
+    process_sprites_numba
 )
 
 
@@ -135,65 +136,49 @@ class Raycaster:
         self.render_sprites(screen, player, game_map)
     
     def render_sprites(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
-        """Render all sprites (monsters) in the scene.
+        """Render all sprites (monsters) in the scene using Numba optimization.
         
         Args:
             screen: Pygame surface to render to
             player: The player object
-            game_map: The game map containing monsters
+            game_map: The game map containing sprite data
         """
-        if not game_map.monsters:
+        if game_map.sprite_data.shape[0] == 0:
             return
         
-        sprite_data = []
-        for monster in game_map.monsters:
-            distance = monster.get_distance_to_player(player)
-            
-            if distance < 0.1 or distance > self.max_depth:
-                continue
-            
-            sprite_data.append((distance, monster))
+        processed_sprites = process_sprites_numba(
+            game_map.sprite_data,
+            player.x,
+            player.y,
+            player.rotation,
+            self.fov,
+            self.screen_width,
+            self.screen_height,
+            self.max_depth,
+            settings.render.wall_height_factor,
+            player.bob_offset_y,
+            settings.lighting.enable_inverse_square,
+            settings.lighting.light_intensity,
+            settings.lighting.ambient_light
+        )
         
-        sprite_data.sort(key=lambda x: x[0], reverse=True)
-        
-        player_rad = math.radians(player.rotation)
-        player_cos = math.cos(player_rad)
-        player_sin = math.sin(player_rad)
-        
-        half_fov = math.radians(self.fov / 2.0)
-        tan_half_fov = math.tan(half_fov)
-        aspect_ratio = self.screen_width / self.screen_height
-        
-        for distance, monster in sprite_data:
-            dx = monster.x - player.x
-            dy = monster.y - player.y
-            
-            sprite_y = dx * player_cos + dy * player_sin
-            sprite_x = dy * player_cos - dx * player_sin
-            
-            if sprite_y <= 0.1:
-                continue
-            
-            projection_plane_x = (sprite_x / sprite_y) / (tan_half_fov * aspect_ratio)
-            screen_x = int((self.screen_width / 2.0) * (1.0 + projection_plane_x))
-            
-            sprite_height = int(self.screen_height / sprite_y * settings.render.wall_height_factor)
-            sprite_width = sprite_height
+        for i in range(processed_sprites.shape[0]):
+            screen_x = int(processed_sprites[i, 0])
+            sprite_height = int(processed_sprites[i, 1])
+            sprite_width = int(processed_sprites[i, 2])
+            distance = processed_sprites[i, 3]
+            texture_id = int(processed_sprites[i, 4])
+            light_factor = processed_sprites[i, 5]
             
             draw_start_y = int((self.screen_height - sprite_height) / 2 + player.bob_offset_y)
             draw_start_x = int(screen_x - sprite_width / 2)
             
-            sprite_texture = self.asset_manager.get_sprite_texture(monster.texture_id)
+            sprite_texture = self.asset_manager.get_sprite_texture(texture_id)
             if sprite_texture is None:
                 continue
             
             if sprite_width > 0 and sprite_height > 0:
                 scaled_sprite = pygame.transform.scale(sprite_texture, (sprite_width, sprite_height))
-                
-                light_factor = 1.0
-                if settings.lighting.enable_inverse_square:
-                    light_factor = min(1.0, settings.lighting.light_intensity / (distance * distance + 0.1))
-                    light_factor = max(settings.lighting.ambient_light, light_factor)
                 
                 if light_factor < 1.0:
                     dark_surface = pygame.Surface(scaled_sprite.get_size(), pygame.SRCALPHA)
@@ -240,9 +225,11 @@ class Raycaster:
                         (tile_x, tile_y, minimap_scale, minimap_scale)
                     )
         
-        for monster in game_map.monsters:
-            monster_x = minimap_x + monster.x * minimap_scale
-            monster_y = minimap_y + monster.y * minimap_scale
+        for i in range(game_map.sprite_data.shape[0]):
+            sprite_x_world = game_map.sprite_data[i, 0]
+            sprite_y_world = game_map.sprite_data[i, 1]
+            monster_x = minimap_x + sprite_x_world * minimap_scale
+            monster_y = minimap_y + sprite_y_world * minimap_scale
             pygame.draw.circle(
                 screen,
                 (255, 100, 100),

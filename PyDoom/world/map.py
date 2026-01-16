@@ -5,7 +5,6 @@ from typing import List, Tuple
 import numpy as np
 
 from settings import settings
-from world.monster import Monster
 
 
 class Map:
@@ -22,6 +21,7 @@ class Map:
         self.width: int = len(grid[0])
         self.height: int = len(grid)
         self.player_start: Tuple[float, float] = player_start
+        self.sprite_data: np.ndarray = np.empty((0, 3), dtype=np.float32)
         
         self.grid_array: np.ndarray = np.array(grid, dtype=np.int32)
 
@@ -40,7 +40,7 @@ class Map:
         """
         grid: List[List[int]] = []
         player_start: Tuple[float, float] = (2.0, 2.0)
-        monsters: List[Monster] = []
+        sprite_list: List[Tuple[float, float, int]] = []
         
         try:
             with open(filename, 'r') as file:
@@ -53,12 +53,13 @@ class Map:
                             player_start = (float(x) + 0.5, float(y) + 0.5)
                             row.append(0)
                         elif char.upper() == 'M':
-                            monsters.append(Monster(float(x) + 0.5, float(y) + 0.5, texture_id=0))
+                            sprite_list.append((float(x) + 0.5, float(y) + 0.5, 0))
                             row.append(0)
                     if row:
                         grid.append(row)
             game_map = Map(grid, player_start)
-            game_map.monsters = monsters
+            if sprite_list:
+                game_map.sprite_data = np.array(sprite_list, dtype=np.float32)
             return game_map
         except FileNotFoundError:
             print(f"Error: map file '{filename}' not found.")
@@ -83,11 +84,15 @@ class Map:
         return self.grid[map_y][map_x] > 0
     
     def add_monster(self, x: float, y: float, texture_id: int = 0) -> None:
-        """Add a monster to the map.
+        """Add a monster/sprite to the map.
         
         Args:
             x: X position in world coordinates
             y: Y position in world coordinates
             texture_id: Texture ID for the sprite
         """
-        self.monsters.append(Monster(x, y, texture_id))
+        new_sprite = np.array([[x, y, texture_id]], dtype=np.float32)
+        if self.sprite_data.shape[0] == 0:
+            self.sprite_data = new_sprite
+        else:
+            self.sprite_data = np.vstack([self.sprite_data, new_sprite])

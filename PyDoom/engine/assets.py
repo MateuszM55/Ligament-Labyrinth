@@ -147,17 +147,21 @@ class AssetManager:
             ((80, 80, 80), (60, 60, 60)),    # ID 0 (default gray)
             ((100, 70, 50), (80, 50, 30)),   # ID 1 (brown/wood)
             ((60, 80, 60), (40, 60, 40)),    # ID 2 (green/grass)
-            ((70, 70, 90), (50, 50, 70))     # ID 3 (blue/stone)
+            ((70, 70, 90), (50, 50, 70)),    # ID 3 (blue/stone)
+            ((90, 70, 60), (70, 50, 40)),    # ID 4 (red/brick)
+            ((110, 90, 70), (90, 70, 50))    # ID 5 (tan/sand)
         ]
         
         ceiling_colors = [
             ((40, 40, 60), (30, 30, 50)),    # ID 0 (default dark blue)
             ((60, 50, 40), (40, 30, 20)),    # ID 1 (brown/wood)
             ((50, 70, 50), (30, 50, 30)),    # ID 2 (green)
-            ((80, 80, 100), (60, 60, 80))    # ID 3 (light stone)
+            ((80, 80, 100), (60, 60, 80)),   # ID 3 (light stone)
+            ((80, 60, 50), (60, 40, 30)),    # ID 4 (red/brick)
+            ((100, 90, 80), (80, 70, 60))    # ID 5 (tan/sand)
         ]
         
-        for i in range(1, 4):
+        for i in range(1, 6):
             if i not in self.floor_textures:
                 floor_surface = self._generate_checkerboard_texture(
                     texture_size,

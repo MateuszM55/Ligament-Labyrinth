@@ -117,8 +117,12 @@ def cast_ray_numba(
 @numba.njit(fastmath=True, parallel=False)
 def render_floor_ceiling_numba(
     buffer_pixels: np.ndarray,
-    floor_array: np.ndarray,
-    ceiling_array: np.ndarray,
+    floor_arrays: np.ndarray,
+    ceiling_arrays: np.ndarray,
+    floor_grid: np.ndarray,
+    ceiling_grid: np.ndarray,
+    map_width: int,
+    map_height: int,
     floor_width: int,
     floor_height: int,
     floor_scale: int,
@@ -141,8 +145,12 @@ def render_floor_ceiling_numba(
     
     Args:
         buffer_pixels: Output pixel buffer (floor_width x floor_height x 3)
-        floor_array: Floor texture array (tex_width x tex_height x 3)
-        ceiling_array: Ceiling texture array (tex_width x tex_height x 3)
+        floor_arrays: All floor textures (num_textures x tex_width x tex_height x 3)
+        ceiling_arrays: All ceiling textures (num_textures x tex_width x tex_height x 3)
+        floor_grid: Floor texture ID map (map_height x map_width)
+        ceiling_grid: Ceiling texture ID map (map_height x map_width)
+        map_width: Width of the map
+        map_height: Height of the map
         floor_width: Width of the render buffer
         floor_height: Height of the render buffer
         floor_scale: Downscaling factor for floor rendering
@@ -166,10 +174,12 @@ def render_floor_ceiling_numba(
     aspect_ratio = screen_width / screen_height
     screen_half = screen_height / 2.0 + bob_offset_y
     
-    floor_tex_width = floor_array.shape[0]
-    floor_tex_height = floor_array.shape[1]
-    ceiling_tex_width = ceiling_array.shape[0]
-    ceiling_tex_height = ceiling_array.shape[1]
+    num_floor_textures = floor_arrays.shape[0]
+    num_ceiling_textures = ceiling_arrays.shape[0]
+    floor_tex_width = floor_arrays.shape[1]
+    floor_tex_height = floor_arrays.shape[2]
+    ceiling_tex_width = ceiling_arrays.shape[1]
+    ceiling_tex_height = ceiling_arrays.shape[2]
     
     player_cos = math.cos(player_rotation_rad)
     player_sin = math.sin(player_rotation_rad)
@@ -221,7 +231,26 @@ def render_floor_ceiling_numba(
             # Combine lighting effects
             final_lighting = distance_factor * vignette_multiplier
             
+            # Get map tile coordinates
+            map_x = int(world_x)
+            map_y = int(world_y)
+            
+            # Clamp to map bounds
+            if map_x < 0:
+                map_x = 0
+            if map_x >= map_width:
+                map_x = map_width - 1
+            if map_y < 0:
+                map_y = 0
+            if map_y >= map_height:
+                map_y = map_height - 1
+            
             if p > epsilon:
+                # Floor rendering
+                floor_tex_id = floor_grid[map_y, map_x]
+                if floor_tex_id >= num_floor_textures:
+                    floor_tex_id = 0
+                
                 tex_x = int(world_x * floor_tex_width) % floor_tex_width
                 tex_y = int(world_y * floor_tex_height) % floor_tex_height
                 
@@ -230,11 +259,17 @@ def render_floor_ceiling_numba(
                 if tex_y < 0:
                     tex_y += floor_tex_height
                 
-                buffer_pixels[x, y, 0] = int(floor_array[tex_x, tex_y, 0] * final_lighting)
-                buffer_pixels[x, y, 1] = int(floor_array[tex_x, tex_y, 1] * final_lighting)
-                buffer_pixels[x, y, 2] = int(floor_array[tex_x, tex_y, 2] * final_lighting)
+                buffer_pixels[x, y, 0] = int(floor_arrays[floor_tex_id, tex_x, tex_y, 0] * final_lighting)
+                buffer_pixels[x, y, 1] = int(floor_arrays[floor_tex_id, tex_x, tex_y, 1] * final_lighting)
+                buffer_pixels[x, y, 2] = int(floor_arrays[floor_tex_id, tex_x, tex_y, 2] * final_lighting)
+            
             
             elif p < -epsilon:
+                # Ceiling rendering
+                ceiling_tex_id = ceiling_grid[map_y, map_x]
+                if ceiling_tex_id >= num_ceiling_textures:
+                    ceiling_tex_id = 0
+                
                 tex_x = int(world_x * ceiling_tex_width) % ceiling_tex_width
                 tex_y = int(world_y * ceiling_tex_height) % ceiling_tex_height
                 
@@ -243,9 +278,9 @@ def render_floor_ceiling_numba(
                 if tex_y < 0:
                     tex_y += ceiling_tex_height
                 
-                buffer_pixels[x, y, 0] = int(ceiling_array[tex_x, tex_y, 0] * final_lighting)
-                buffer_pixels[x, y, 1] = int(ceiling_array[tex_x, tex_y, 1] * final_lighting)
-                buffer_pixels[x, y, 2] = int(ceiling_array[tex_x, tex_y, 2] * final_lighting)
+                buffer_pixels[x, y, 0] = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 0] * final_lighting)
+                buffer_pixels[x, y, 1] = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 1] * final_lighting)
+                buffer_pixels[x, y, 2] = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 2] * final_lighting)
 
 
 @numba.njit(fastmath=True)

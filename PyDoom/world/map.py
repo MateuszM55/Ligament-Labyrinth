@@ -12,12 +12,15 @@ from world.monster import Monster
 class Map:
     """Tile-based map where each cell can be empty (0) or a wall (1+)."""
     
-    def __init__(self, grid: List[List[int]], player_start: Tuple[float, float] = (2.0, 2.0)) -> None:
+    def __init__(self, grid: List[List[int]], player_start: Tuple[float, float] = (2.0, 2.0), 
+                 floor_grid: List[List[int]] = None, ceiling_grid: List[List[int]] = None) -> None:
         """Initialize the map.
         
         Args:
             grid: 2D list representing the map tiles
             player_start: Starting position for the player
+            floor_grid: 2D list representing floor texture IDs
+            ceiling_grid: 2D list representing ceiling texture IDs
         """
         self.grid: List[List[int]] = grid
         self.width: int = len(grid[0])
@@ -27,6 +30,17 @@ class Map:
         self.monsters: List[Monster] = []
         
         self.grid_array: np.ndarray = np.array(grid, dtype=np.int32)
+        
+        # Floor and ceiling texture maps
+        if floor_grid is None:
+            floor_grid = [[0] * self.width for _ in range(self.height)]
+        if ceiling_grid is None:
+            ceiling_grid = [[0] * self.width for _ in range(self.height)]
+            
+        self.floor_grid: List[List[int]] = floor_grid
+        self.ceiling_grid: List[List[int]] = ceiling_grid
+        self.floor_grid_array: np.ndarray = np.array(floor_grid, dtype=np.int32)
+        self.ceiling_grid_array: np.ndarray = np.array(ceiling_grid, dtype=np.int32)
 
     @staticmethod
     def load_from_file(filename: str) -> 'Map':
@@ -60,7 +74,19 @@ class Map:
                             row.append(0)
                     if row:
                         grid.append(row)
-            game_map = Map(grid, player_start)
+            
+            # Normalize grid to ensure all rows have the same length
+            if grid:
+                max_width = max(len(row) for row in grid)
+                for row in grid:
+                    while len(row) < max_width:
+                        row.append(1)  # Pad with walls
+            
+            # Load floor and ceiling maps
+            floor_grid = Map._load_texture_map(filename.replace('.txt', '_floor.txt'), max_width if grid else 0, len(grid)) if grid else None
+            ceiling_grid = Map._load_texture_map(filename.replace('.txt', '_ceiling.txt'), max_width if grid else 0, len(grid)) if grid else None
+            
+            game_map = Map(grid, player_start, floor_grid, ceiling_grid)
             if sprite_list:
                 game_map.sprite_data = np.array(sprite_list, dtype=np.float32)
                 for sprite_x, sprite_y, texture_id in sprite_list:
@@ -69,6 +95,34 @@ class Map:
         except FileNotFoundError:
             print(f"Error: map file '{filename}' not found.")
             sys.exit(1)
+    
+    @staticmethod
+    def _load_texture_map(filename: str, expected_width: int, expected_height: int) -> List[List[int]]:
+        """Load a texture map from file (for floors or ceilings).
+        
+        Args:
+            filename: Path to the texture map file
+            expected_width: Expected width of the map
+            expected_height: Expected height of the map
+            
+        Returns:
+            2D list of texture IDs, or default grid if file not found
+        """
+        try:
+            texture_grid: List[List[int]] = []
+            with open(filename, 'r') as file:
+                for line in file:
+                    row: List[int] = []
+                    for char in line.strip():
+                        if char.isdigit():
+                            row.append(int(char))
+                    if row:
+                        texture_grid.append(row)
+            print(f"Loaded texture map from {filename}")
+            return texture_grid
+        except FileNotFoundError:
+            print(f"Warning: texture map file '{filename}' not found. Using default texture (ID 0).")
+            return [[0] * expected_width for _ in range(expected_height)]
         
     def is_wall(self, x: float, y: float) -> bool:
         """Check if given world coordinates contain a wall.

@@ -53,16 +53,20 @@ class Raycaster:
             player: The player object
             game_map: The game map
         """
-        floor_array = self.asset_manager.get_floor_array()
-        ceiling_array = self.asset_manager.get_ceiling_array()
+        floor_arrays = self.asset_manager.get_floor_arrays()
+        ceiling_arrays = self.asset_manager.get_ceiling_arrays()
         
         buffer_surf = pygame.Surface((self.floor_width, self.floor_height))
         buffer_pixels = pygame.surfarray.pixels3d(buffer_surf)
         
         render_floor_ceiling_numba(
             buffer_pixels,
-            floor_array,
-            ceiling_array,
+            floor_arrays,
+            ceiling_arrays,
+            game_map.floor_grid_array,
+            game_map.ceiling_grid_array,
+            game_map.width,
+            game_map.height,
             self.floor_width,
             self.floor_height,
             self.floor_scale,

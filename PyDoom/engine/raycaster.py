@@ -40,6 +40,13 @@ class Raycaster:
         self.floor_width: int = screen_width // self.floor_scale
         self.floor_height: int = screen_height // self.floor_scale
         
+        # Cache floor/ceiling buffer to avoid recreating every frame
+        self.floor_ceiling_buffer: pygame.Surface = pygame.Surface((self.floor_width, self.floor_height))
+        
+        # Cache minimap static surface to avoid redrawing walls every frame
+        self.minimap_cache: pygame.Surface = None
+        self.minimap_cache_valid: bool = False
+        
     def render_floor_ceiling_vectorized(
         self, 
         screen: pygame.Surface, 
@@ -58,8 +65,7 @@ class Raycaster:
         floor_arrays = self.asset_manager.get_floor_arrays()
         ceiling_arrays = self.asset_manager.get_ceiling_arrays()
         
-        buffer_surf = pygame.Surface((self.floor_width, self.floor_height))
-        buffer_pixels = pygame.surfarray.pixels3d(buffer_surf)
+        buffer_pixels = pygame.surfarray.pixels3d(self.floor_ceiling_buffer)
         
         render_floor_ceiling_numba(
             buffer_pixels,
@@ -92,7 +98,7 @@ class Raycaster:
         del buffer_pixels
         
         scaled_surf = pygame.transform.scale(
-            buffer_surf, 
+            self.floor_ceiling_buffer, 
             (self.screen_width, self.screen_height)
         )
         screen.blit(scaled_surf, (0, 0))
@@ -212,31 +218,36 @@ class Raycaster:
         minimap_x = screen.get_width() - minimap_size - settings.minimap.margin
         minimap_y = settings.minimap.margin
         
-        pygame.draw.rect(
-            screen, 
-            settings.colors.minimap_background,
-            (minimap_x, minimap_y, minimap_size, minimap_size)
-        )
+        # Generate static minimap cache if not valid
+        if not self.minimap_cache_valid:
+            self.minimap_cache = pygame.Surface((minimap_size, minimap_size))
+            self.minimap_cache.fill(settings.colors.minimap_background)
+            
+            # Draw all static walls once
+            for y in range(game_map.height):
+                for x in range(game_map.width):
+                    tile = game_map.grid[y][x]
+                    if tile > 0:
+                        tile_x = x * minimap_scale
+                        tile_y = y * minimap_scale
+                        
+                        color = settings.colors.minimap_wall_default
+                        if tile == 2:
+                            color = settings.colors.minimap_wall_type2
+                        if tile == 3:
+                            color = settings.colors.minimap_wall_type3
+                        
+                        pygame.draw.rect(
+                            self.minimap_cache, 
+                            color,
+                            (tile_x, tile_y, minimap_scale, minimap_scale)
+                        )
+            self.minimap_cache_valid = True
         
-        for y in range(game_map.height):
-            for x in range(game_map.width):
-                tile = game_map.grid[y][x]
-                if tile > 0:
-                    tile_x = minimap_x + x * minimap_scale
-                    tile_y = minimap_y + y * minimap_scale
-                    
-                    color = settings.colors.minimap_wall_default
-                    if tile == 2:
-                        color = settings.colors.minimap_wall_type2
-                    if tile == 3:
-                        color = settings.colors.minimap_wall_type3
-                    
-                    pygame.draw.rect(
-                        screen, 
-                        color,
-                        (tile_x, tile_y, minimap_scale, minimap_scale)
-                    )
+        # Blit cached static minimap
+        screen.blit(self.minimap_cache, (minimap_x, minimap_y))
         
+        # Draw dynamic elements (monsters)
         for i in range(game_map.sprite_data.shape[0]):
             sprite_x_world = game_map.sprite_data[i, 0]
             sprite_y_world = game_map.sprite_data[i, 1]

@@ -159,14 +159,12 @@ class Game:
     
     def check_monster_collisions(self) -> None:
         """Check if player collides with any monsters and end game if so."""
-        collision_distance = settings.monster.collision_distance
+        collision_distance_squared = settings.monster.collision_distance ** 2
         
         for monster in self.game_map.monsters:
-            dx = self.player.x - monster.x
-            dy = self.player.y - monster.y
-            distance = math.sqrt(dx * dx + dy * dy)
+            distance_squared = monster.get_distance_squared_to_player(self.player)
             
-            if distance < collision_distance:
+            if distance_squared < collision_distance_squared:
                 self.running = False
                 break
     

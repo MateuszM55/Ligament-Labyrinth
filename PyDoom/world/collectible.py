@@ -36,6 +36,19 @@ class Collectible:
         dy = player.y - self.y
         return math.sqrt(dx * dx + dy * dy)
     
+    def get_distance_squared_to_player(self, player: 'Player') -> float:
+        """Calculate squared distance from collectible to player (faster, no sqrt).
+        
+        Args:
+            player: The player object
+            
+        Returns:
+            Squared distance in world units
+        """
+        dx = player.x - self.x
+        dy = player.y - self.y
+        return dx * dx + dy * dy
+    
     def check_collection(self, player: 'Player', collection_distance: float) -> bool:
         """Check if player is close enough to collect this item.
         
@@ -48,9 +61,10 @@ class Collectible:
         """
         if self.collected:
             return False
-            
-        distance = self.get_distance_to_player(player)
-        if distance < collection_distance:
+        
+        # Use squared distance to avoid expensive sqrt
+        distance_squared = self.get_distance_squared_to_player(player)
+        if distance_squared < collection_distance * collection_distance:
             self.collected = True
             return True
         return False

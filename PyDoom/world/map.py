@@ -165,13 +165,10 @@ class Map:
         """
         if texture_id is None:
             texture_id = random.randint(0, 10)
-        new_sprite = np.array([[x, y, texture_id]], dtype=np.float32)
-        if self.sprite_data.shape[0] == 0:
-            self.sprite_data = new_sprite
-        else:
-            self.sprite_data = np.vstack([self.sprite_data, new_sprite])
         
         self.monsters.append(Monster(x, y, texture_id))
+        # Rebuild sprite_data from monsters list (avoids expensive np.vstack)
+        self.update_sprite_data()
     
     def update_sprite_data(self) -> None:
         """Update sprite_data array from monster and collectible positions."""

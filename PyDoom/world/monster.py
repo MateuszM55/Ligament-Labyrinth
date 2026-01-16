@@ -51,6 +51,19 @@ class Monster:
         dy = player.y - self.y
         return math.sqrt(dx * dx + dy * dy)
     
+    def get_distance_squared_to_player(self, player: 'Player') -> float:
+        """Calculate squared distance from monster to player (faster, no sqrt).
+        
+        Args:
+            player: The player object
+            
+        Returns:
+            Squared distance in world units
+        """
+        dx = player.x - self.x
+        dy = player.y - self.y
+        return dx * dx + dy * dy
+    
     def move_towards_player(self, player: 'Player', dt: float) -> None:
         """Move the monster towards the player, ignoring walls.
         

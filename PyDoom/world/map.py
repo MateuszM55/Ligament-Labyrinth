@@ -1,6 +1,7 @@
 """Tile-based map handling."""
 
 import sys
+import random
 from typing import List, Tuple
 import numpy as np
 
@@ -55,7 +56,7 @@ class Map:
                             player_start = (float(x) + 0.5, float(y) + 0.5)
                             row.append(0)
                         elif char.upper() == 'M':
-                            sprite_list.append((float(x) + 0.5, float(y) + 0.5, 0))
+                            sprite_list.append((float(x) + 0.5, float(y) + 0.5, random.randint(0, 10)))
                             row.append(0)
                     if row:
                         grid.append(row)
@@ -87,14 +88,16 @@ class Map:
             
         return self.grid[map_y][map_x] > 0
     
-    def add_monster(self, x: float, y: float, texture_id: int = 0) -> None:
+    def add_monster(self, x: float, y: float, texture_id: int = None) -> None:
         """Add a monster/sprite to the map.
         
         Args:
             x: X position in world coordinates
             y: Y position in world coordinates
-            texture_id: Texture ID for the sprite
+            texture_id: Texture ID for the sprite (random if None)
         """
+        if texture_id is None:
+            texture_id = random.randint(0, 10)
         new_sprite = np.array([[x, y, texture_id]], dtype=np.float32)
         if self.sprite_data.shape[0] == 0:
             self.sprite_data = new_sprite

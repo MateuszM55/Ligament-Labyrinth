@@ -131,9 +131,15 @@ def render_floor_ceiling_numba(
     bob_offset_y: float,
     floor_fog_intensity: float,
     ceiling_fog_intensity: float,
-    fog_distance: float
+    fog_distance: float,
+    enable_inverse_square: bool,
+    light_intensity: float,
+    ambient_light: float,
+    enable_vignette: bool,
+    vignette_intensity: float,
+    vignette_radius: float
 ) -> None:
-    """Render floor and ceiling with Numba optimization.
+    """Render floor and ceiling with Numba optimization and advanced lighting.
     
     Args:
         buffer_pixels: Output pixel buffer (floor_width x floor_height x 3)
@@ -152,6 +158,12 @@ def render_floor_ceiling_numba(
         floor_fog_intensity: Floor fog intensity (0-1)
         ceiling_fog_intensity: Ceiling fog intensity (0-1)
         fog_distance: Base fog distance
+        enable_inverse_square: Use inverse square law for distance
+        light_intensity: Base light power for inverse square
+        ambient_light: Minimum light level (0-1)
+        enable_vignette: Enable screen edge vignette
+        vignette_intensity: Vignette darkness (0-1)
+        vignette_radius: Vignette start radius (0-1)
     """
     half_fov_rad = fov_rad / 2.0
     tan_half_fov = math.tan(half_fov_rad)
@@ -172,9 +184,11 @@ def render_floor_ceiling_numba(
     pos_z = 0.5 * screen_height
     epsilon = 1.0
     
+    
     for y in range(floor_height):
         for x in range(floor_width):
             screen_y = y * floor_scale
+            screen_x = x * floor_scale
             p = screen_y - screen_half
             
             if abs(p) < epsilon:
@@ -189,10 +203,32 @@ def render_floor_ceiling_numba(
             world_x = player_x + ray_dir_x * row_distance
             world_y = player_y + ray_dir_y * row_distance
             
-            fog_factor = min(row_distance / fog_distance, 1.0)
+            # Calculate distance-based lighting
+            if enable_inverse_square:
+                distance_factor = light_intensity / (row_distance * row_distance + 0.1)
+                distance_factor = max(ambient_light, min(1.0, distance_factor))
+            else:
+                fog_factor = min(row_distance / fog_distance, 1.0)
+                distance_factor = 1.0
+            
+            # Calculate vignette effect
+            vignette_multiplier = 1.0
+            if enable_vignette:
+                x_norm = (screen_x - screen_width / 2.0) / (screen_width / 2.0)
+                y_norm = (screen_y - screen_height / 2.0) / (screen_height / 2.0)
+                screen_dist = math.sqrt(x_norm * x_norm + y_norm * y_norm)
+                
+                if screen_dist > vignette_radius:
+                    vignette_falloff = (screen_dist - vignette_radius) / (1.414 - vignette_radius + 0.001)
+                    vignette_falloff = min(1.0, vignette_falloff)
+                    vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
             
             if p > epsilon:
-                floor_fog = 1.0 - fog_factor * floor_fog_intensity
+                if enable_inverse_square:
+                    floor_fog = distance_factor * vignette_multiplier
+                else:
+                    fog_factor = min(row_distance / fog_distance, 1.0)
+                    floor_fog = (1.0 - fog_factor * floor_fog_intensity) * vignette_multiplier
                 
                 tex_x = int(world_x * floor_tex_width) % floor_tex_width
                 tex_y = int(world_y * floor_tex_height) % floor_tex_height
@@ -207,7 +243,11 @@ def render_floor_ceiling_numba(
                 buffer_pixels[x, y, 2] = int(floor_array[tex_x, tex_y, 2] * floor_fog)
             
             elif p < -epsilon:
-                ceiling_fog = 1.0 - fog_factor * ceiling_fog_intensity
+                if enable_inverse_square:
+                    ceiling_fog = distance_factor * vignette_multiplier
+                else:
+                    fog_factor = min(row_distance / fog_distance, 1.0)
+                    ceiling_fog = (1.0 - fog_factor * ceiling_fog_intensity) * vignette_multiplier
                 
                 tex_x = int(world_x * ceiling_tex_width) % ceiling_tex_width
                 tex_y = int(world_y * ceiling_tex_height) % ceiling_tex_height
@@ -242,9 +282,19 @@ def render_walls_numba(
     bob_offset_y: float,
     fog_base_distance: float,
     fog_base_intensity: float,
-    side_darkening_alpha: int
+    side_darkening_alpha: int,
+    enable_flashlight: bool,
+    flashlight_radius: float,
+    flashlight_intensity: float,
+    flashlight_sharpness: float,
+    enable_inverse_square: bool,
+    light_intensity: float,
+    ambient_light: float,
+    enable_vignette: bool,
+    vignette_intensity: float,
+    vignette_radius: float
 ) -> None:
-    """Render walls using Numba optimization.
+    """Render walls using Numba optimization with advanced horror lighting.
     
     Args:
         screen_pixels: Output pixel buffer (screen_width x screen_height x 3)
@@ -266,6 +316,16 @@ def render_walls_numba(
         fog_base_distance: Base fog distance
         fog_base_intensity: Base fog intensity (0-1)
         side_darkening_alpha: Alpha value for side darkening (0-255)
+        enable_flashlight: Enable flashlight radial falloff
+        flashlight_radius: Flashlight beam radius (0-1)
+        flashlight_intensity: Flashlight edge darkening (0-1)
+        flashlight_sharpness: Flashlight falloff sharpness
+        enable_inverse_square: Use inverse square law for distance
+        light_intensity: Base light power for inverse square
+        ambient_light: Minimum light level (0-1)
+        enable_vignette: Enable screen edge vignette
+        vignette_intensity: Vignette darkness (0-1)
+        vignette_radius: Vignette start radius (0-1)
     """
     half_fov_rad = math.radians(fov / 2.0)
     tan_half_fov = math.tan(half_fov_rad)
@@ -316,18 +376,61 @@ def render_walls_numba(
         if hit_val < len(texture_map):
             texture_idx = int(texture_map[hit_val])
         
-        fog_intensity = min(1.0, distance / fog_base_distance)
-        base_fog_alpha = fog_intensity * fog_base_intensity
-        side_alpha = side_darkening_alpha / 255.0 if side == 1 else 0.0
-        total_alpha = min(1.0, base_fog_alpha + side_alpha)
+        # Calculate lighting intensity
+        lighting_multiplier = 1.0
+        
+        # 1. Distance-based lighting (inverse square law or linear)
+        if enable_inverse_square:
+            # Inverse square law: intensity = power / (distance^2)
+            distance_factor = light_intensity / (distance * distance + 0.1)
+            distance_factor = max(ambient_light, min(1.0, distance_factor))
+        else:
+            # Original linear fog
+            fog_intensity = min(1.0, distance / fog_base_distance)
+            distance_factor = 1.0 - (fog_intensity * fog_base_intensity)
+        
+        lighting_multiplier *= distance_factor
+        
+        # 2. Side darkening (horizontal vs vertical walls)
+        if side == 1:
+            side_alpha = side_darkening_alpha / 255.0
+            lighting_multiplier *= (1.0 - side_alpha)
         
         x_start = int(ray_index * ray_width)
         x_end = int((ray_index + 1) * ray_width)
         x_end = min(x_end, screen_width)
         
+        
         if wall_height > 0 and wall_height < 8000:
             for screen_x_pos in range(x_start, x_end):
+                # Calculate flashlight effect (radial falloff from center)
+                flashlight_multiplier = 1.0
+                if enable_flashlight:
+                    x_norm = (screen_x_pos - screen_width / 2.0) / (screen_width / 2.0)
+                    radial_dist = abs(x_norm)
+                    
+                    if radial_dist > flashlight_radius:
+                        falloff = (radial_dist - flashlight_radius) / (1.0 - flashlight_radius + 0.001)
+                        falloff = min(1.0, falloff ** flashlight_sharpness)
+                        flashlight_multiplier = 1.0 - (falloff * flashlight_intensity)
+                
+                # Calculate vignette effect (per-pixel screen position)
                 for screen_y_pos in range(max(0, wall_top), min(screen_height, wall_top + wall_height)):
+                    vignette_multiplier = 1.0
+                    if enable_vignette:
+                        x_norm = (screen_x_pos - screen_width / 2.0) / (screen_width / 2.0)
+                        y_norm = (screen_y_pos - screen_height / 2.0) / (screen_height / 2.0)
+                        screen_dist = math.sqrt(x_norm * x_norm + y_norm * y_norm)
+                        
+                        if screen_dist > vignette_radius:
+                            vignette_falloff = (screen_dist - vignette_radius) / (1.414 - vignette_radius + 0.001)
+                            vignette_falloff = min(1.0, vignette_falloff)
+                            vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
+                    
+                    # Combine all lighting effects
+                    final_lighting = lighting_multiplier * flashlight_multiplier * vignette_multiplier
+                    final_lighting = max(0.0, min(1.0, final_lighting))
+                    
                     y_ratio = (screen_y_pos - wall_top) / wall_height
                     tex_y = int(y_ratio * tex_height)
                     tex_y = max(0, min(tex_y, tex_height - 1))
@@ -336,9 +439,9 @@ def render_walls_numba(
                     g = texture_arrays[texture_idx, tex_x, tex_y, 1]
                     b = texture_arrays[texture_idx, tex_x, tex_y, 2]
                     
-                    r = int(r * (1.0 - total_alpha))
-                    g = int(g * (1.0 - total_alpha))
-                    b = int(b * (1.0 - total_alpha))
+                    r = int(r * final_lighting)
+                    g = int(g * final_lighting)
+                    b = int(b * final_lighting)
                     
                     screen_pixels[screen_x_pos, screen_y_pos, 0] = r
                     screen_pixels[screen_x_pos, screen_y_pos, 1] = g

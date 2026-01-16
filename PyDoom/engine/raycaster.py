@@ -74,7 +74,13 @@ class Raycaster:
             player.bob_offset_y,
             settings.fog.floor_fog_intensity,
             settings.fog.ceiling_fog_intensity,
-            settings.fog.base_fog_distance
+            settings.fog.base_fog_distance,
+            settings.lighting.enable_inverse_square,
+            settings.lighting.light_intensity,
+            settings.lighting.ambient_light,
+            settings.lighting.enable_vignette,
+            settings.lighting.vignette_intensity,
+            settings.lighting.vignette_radius
         )
         
         del buffer_pixels
@@ -119,7 +125,17 @@ class Raycaster:
             player.bob_offset_y,
             settings.fog.base_fog_distance,
             settings.fog.base_fog_intensity,
-            settings.fog.side_darkening_alpha
+            settings.fog.side_darkening_alpha,
+            settings.lighting.enable_flashlight,
+            settings.lighting.flashlight_radius,
+            settings.lighting.flashlight_intensity,
+            settings.lighting.flashlight_sharpness,
+            settings.lighting.enable_inverse_square,
+            settings.lighting.light_intensity,
+            settings.lighting.ambient_light,
+            settings.lighting.enable_vignette,
+            settings.lighting.vignette_intensity,
+            settings.lighting.vignette_radius
         )
         
         del screen_pixels

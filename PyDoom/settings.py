@@ -90,11 +90,31 @@ class MinimapSettings:
 @dataclass(frozen=True)
 class FogSettings:
     """Fog and lighting configuration."""
-    base_fog_distance: float = 10.0
-    base_fog_intensity: float = 0.6
-    floor_fog_intensity: float = 0.6
-    ceiling_fog_intensity: float = 0.7
-    side_darkening_alpha: int = 80
+    base_fog_distance: float = 1.0
+    base_fog_intensity: float = 1
+    floor_fog_intensity: float = 0
+    ceiling_fog_intensity: float = 0
+    side_darkening_alpha: int = 0
+
+
+@dataclass(frozen=True)
+class LightingSettings:
+    """Advanced lighting configuration for horror atmosphere."""
+    # Flashlight effect (radial falloff)
+    enable_flashlight: bool = True
+    flashlight_radius: float = 0.4  # 0.0 = narrow beam, 1.0 = wide beam
+    flashlight_intensity: float = 0  # How much darker the edges are (0-1)
+    flashlight_sharpness: float = 2.0  # Higher = sharper falloff
+    
+    # Inverse square law (distance falloff)
+    enable_inverse_square: bool = True
+    light_intensity: float = 3  # Base light power
+    ambient_light: float = 0.03  # Minimum light level (0-1)
+    
+    # Vignette effect
+    enable_vignette: bool = True
+    vignette_intensity: float = 1  # 0-1, how dark the edges get
+    vignette_radius: float = 0.1  # 0-1, where vignette starts
 
 
 @dataclass(frozen=True)
@@ -108,6 +128,7 @@ class GameSettings:
     colors: ColorPalette = ColorPalette()
     minimap: MinimapSettings = MinimapSettings()
     fog: FogSettings = FogSettings()
+    lighting: LightingSettings = LightingSettings()
     
     show_fps: bool = True
 

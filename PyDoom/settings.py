@@ -19,7 +19,7 @@ class RenderSettings:
     fov: float = 60.0
     max_depth: float = 100.0
     wall_ray_resolution_divisor: int = 1
-    floor_and_ceiling_scale: int = 1
+    floor_ceiling_ray_resolution_divisor: int = 1
     wall_height_factor: float = 1
 
 

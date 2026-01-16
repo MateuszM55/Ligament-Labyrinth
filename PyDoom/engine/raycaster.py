@@ -35,7 +35,7 @@ class Raycaster:
         self.num_rays: int = screen_width // settings.render.wall_ray_resolution_divisor
         self.ray_width: float = self.screen_width / self.num_rays
         
-        self.floor_scale: int = settings.render.floor_and_ceiling_scale
+        self.floor_scale: int = settings.render.floor_ceiling_ray_resolution_divisor
         self.floor_width: int = screen_width // self.floor_scale
         self.floor_height: int = screen_height // self.floor_scale
         

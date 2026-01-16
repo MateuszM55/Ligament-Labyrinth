@@ -20,8 +20,15 @@ class RenderSettings:
     max_depth: float = 100.0
     wall_ray_resolution_divisor: int = 1
     floor_ceiling_ray_resolution_divisor: int = 1
-    wall_height_factor: float = 1
+    wall_height_factor: float = 1.0
     sprite_scale: float = 1.0
+    glitch_intensity: float = 0.0  # LSD Glitch effect intensity (0=off, higher values=more intense color banding)
+    
+    # Monster proximity glitch effect settings
+    glitch_enable_monster_proximity: bool = True  # Enable dynamic glitch based on monster distance
+    glitch_monster_start_distance: float = 5.0  # Distance where glitch starts to appear
+    glitch_monster_max_distance: float = 0.0  # Distance where glitch is at maximum intensity
+    glitch_monster_max_intensity: float = 20.0  # Maximum glitch intensity when monster is very close (2.0+ for dramatic effect)
 
 
 @dataclass(frozen=True)

@@ -58,6 +58,9 @@ class Game:
         self.audio_manager.play_music()
         
         self.font: pygame.font.Font = pygame.font.Font(None, 36)
+        
+        # Dynamic glitch intensity (updated each frame based on monster proximity)
+        self.current_glitch_intensity: float = 0.0
 
     def handle_events(self) -> None:
         """Handle all pygame events."""
@@ -167,6 +170,47 @@ class Game:
                 self.running = False
                 break
     
+    def calculate_glitch_intensity(self) -> float:
+        """Calculate dynamic glitch intensity based on closest monster distance.
+        
+        Returns:
+            Glitch intensity value (0.0 = no glitch, higher = more intense)
+        """
+        # Start with base glitch intensity from settings
+        base_intensity = settings.render.glitch_intensity
+        
+        # If monster proximity glitch is disabled, just return base intensity
+        if not settings.render.glitch_enable_monster_proximity:
+            return base_intensity
+        
+        # Find the closest monster
+        if not self.game_map.monsters:
+            return base_intensity
+        
+        closest_distance = float('inf')
+        for monster in self.game_map.monsters:
+            distance = monster.get_distance_to_player(self.player)
+            closest_distance = min(closest_distance, distance)
+        
+        # Calculate monster-based glitch intensity
+        start_dist = settings.render.glitch_monster_start_distance
+        max_dist = settings.render.glitch_monster_max_distance
+        max_intensity = settings.render.glitch_monster_max_intensity
+        
+        monster_glitch = 0.0
+        if closest_distance < start_dist:
+            if closest_distance <= max_dist:
+                # Maximum glitch when very close
+                monster_glitch = max_intensity
+            else:
+                # Ramp up glitch intensity as monster gets closer
+                # Linear interpolation between start_dist and max_dist
+                progress = (start_dist - closest_distance) / (start_dist - max_dist)
+                monster_glitch = progress * max_intensity
+        
+        # Combine base and monster-based glitch (use maximum of both)
+        return max(base_intensity, monster_glitch)
+    
     def check_collectible_collisions(self) -> None:
         """Check if player collects any collectibles."""
         collection_distance = settings.collectible.collection_distance
@@ -203,13 +247,17 @@ class Game:
             
             self.game_map.update_sprite_data()
             
+            # Update dynamic glitch intensity based on monster proximity
+            self.current_glitch_intensity = self.calculate_glitch_intensity()
+            
             self.check_monster_collisions()
             
     def render(self) -> None:
         """Render everything to the screen."""
         self.screen.fill(settings.colors.black)
         
-        self.raycaster.render_3d_view_numba(self.screen, self.player, self.game_map)
+        # Pass dynamic glitch intensity to renderer
+        self.raycaster.render_3d_view_numba(self.screen, self.player, self.game_map, self.current_glitch_intensity)
         
         self.raycaster.render_minimap(self.screen, self.player, self.game_map)
         

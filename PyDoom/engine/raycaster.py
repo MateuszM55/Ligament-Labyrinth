@@ -44,7 +44,8 @@ class Raycaster:
         self, 
         screen: pygame.Surface, 
         player: Player, 
-        game_map: Map
+        game_map: Map,
+        glitch_intensity: float = 0.0
     ) -> None:
         """Render floor and ceiling using Numba-optimized operations.
         
@@ -52,6 +53,7 @@ class Raycaster:
             screen: Pygame surface to render to
             player: The player object
             game_map: The game map
+            glitch_intensity: Dynamic glitch effect intensity
         """
         floor_arrays = self.asset_manager.get_floor_arrays()
         ceiling_arrays = self.asset_manager.get_ceiling_arrays()
@@ -83,7 +85,8 @@ class Raycaster:
             settings.lighting.ambient_light,
             settings.lighting.enable_vignette,
             settings.lighting.vignette_intensity,
-            settings.lighting.vignette_radius
+            settings.lighting.vignette_radius,
+            glitch_intensity  # Use dynamic glitch intensity
         )
         
         del buffer_pixels
@@ -94,15 +97,16 @@ class Raycaster:
         )
         screen.blit(scaled_surf, (0, 0))
                   
-    def render_3d_view_numba(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
+    def render_3d_view_numba(self, screen: pygame.Surface, player: Player, game_map: Map, glitch_intensity: float = 0.0) -> None:
         """Render the complete 3D view using Numba optimization for walls.
         
         Args:
             screen: Pygame surface to render to
             player: The player object
             game_map: The game map
+            glitch_intensity: Dynamic glitch effect intensity
         """
-        self.render_floor_ceiling_vectorized(screen, player, game_map)
+        self.render_floor_ceiling_vectorized(screen, player, game_map, glitch_intensity)
         
         screen_pixels = pygame.surfarray.pixels3d(screen)
         
@@ -132,7 +136,8 @@ class Raycaster:
             settings.lighting.ambient_light,
             settings.lighting.enable_vignette,
             settings.lighting.vignette_intensity,
-            settings.lighting.vignette_radius
+            settings.lighting.vignette_radius,
+            glitch_intensity  # Use dynamic glitch intensity
         )
         
         del screen_pixels

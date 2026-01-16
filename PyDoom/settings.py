@@ -32,6 +32,9 @@ class PlayerSettings:
     
     bob_amplitude: float = 5.0
     bob_frequency: float = 1.0
+    
+    sprint_multiplier: float = 1.5
+    sprint_bob_multiplier: float = 2.0
 
 
 @dataclass(frozen=True)

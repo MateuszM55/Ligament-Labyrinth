@@ -27,6 +27,7 @@ class Player:
         self.bob_phase: float = 0.0
         self.bob_offset_y: float = 0.0
         self.is_moving: bool = False
+        self.is_sprinting: bool = False
         
         radius = settings.player.collision_radius
         self.collision_offsets: List[Tuple[float, float]] = [
@@ -134,7 +135,11 @@ class Player:
             dt: Delta time in seconds
         """
         if self.is_moving:
-            self.bob_phase += settings.player.bob_frequency * dt
+            bob_freq = settings.player.bob_frequency
+            if self.is_sprinting:
+                bob_freq *= settings.player.sprint_bob_multiplier
+            
+            self.bob_phase += bob_freq * dt
             if self.bob_phase > 2 * math.pi * 100:
                 self.bob_phase = 0
             

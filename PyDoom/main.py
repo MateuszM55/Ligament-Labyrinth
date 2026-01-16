@@ -111,7 +111,12 @@ class Game:
         total_dx = 0.0
         total_dy = 0.0
         
+        is_sprinting = keys[K_LSHIFT] or keys[K_RSHIFT]
+        self.player.is_sprinting = is_sprinting
+        
         move_speed = settings.player.move_speed * dt
+        if is_sprinting:
+            move_speed *= settings.player.sprint_multiplier
         
         if keys[K_w]:
             total_dx += self.player._cos_cache * move_speed

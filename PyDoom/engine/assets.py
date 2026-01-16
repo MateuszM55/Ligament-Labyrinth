@@ -15,6 +15,7 @@ class AssetManager:
     def __init__(self) -> None:
         """Initialize the asset manager and load all textures."""
         self.textures: Dict[int, pygame.Surface] = {}
+        self.sprite_textures: Dict[int, pygame.Surface] = {}
         
         self.floor_array: Optional[np.ndarray] = None
         self.ceiling_array: Optional[np.ndarray] = None
@@ -61,30 +62,39 @@ class AssetManager:
             
             full_path = os.path.join(texture_dir, filename)
             
-            match = re.search(r'(\d+)', filename)
-            if match:
-                try:
-                    tex_id = int(match.group(1))
-                    self.textures[tex_id] = pygame.image.load(full_path).convert()
-                    print(f"Loaded texture {tex_id} from {filename}")
-                except pygame.error as e:
-                    print(f"Failed to load texture {filename}: {e}")
-            
-            if "floor" in filename.lower() and self.floor_array is None:
+            if "sprite" in filename.lower():
+                match = re.search(r'(\d+)', filename)
+                if match:
+                    try:
+                        sprite_id = int(match.group(1))
+                        sprite_surface = pygame.image.load(full_path).convert_alpha()
+                        self.sprite_textures[sprite_id] = sprite_surface
+                        print(f"Loaded sprite texture {sprite_id} from {filename}")
+                    except pygame.error as e:
+                        print(f"Failed to load sprite texture {filename}: {e}")
+            elif "floor" in filename.lower() and self.floor_array is None:
                 try:
                     floor_surface = pygame.image.load(full_path).convert()
                     self.floor_array = pygame.surfarray.array3d(floor_surface)
                     print(f"Loaded floor texture from {filename}")
                 except pygame.error as e:
                     print(f"Failed to load floor texture {filename}: {e}")
-            
-            if "ceiling" in filename.lower() and self.ceiling_array is None:
+            elif "ceiling" in filename.lower() and self.ceiling_array is None:
                 try:
                     ceiling_surface = pygame.image.load(full_path).convert()
                     self.ceiling_array = pygame.surfarray.array3d(ceiling_surface)
                     print(f"Loaded ceiling texture from {filename}")
                 except pygame.error as e:
                     print(f"Failed to load ceiling texture {filename}: {e}")
+            else:
+                match = re.search(r'(\d+)', filename)
+                if match:
+                    try:
+                        tex_id = int(match.group(1))
+                        self.textures[tex_id] = pygame.image.load(full_path).convert()
+                        print(f"Loaded texture {tex_id} from {filename}")
+                    except pygame.error as e:
+                        print(f"Failed to load texture {filename}: {e}")
     
     def _generate_fallback_textures(self) -> None:
         """Generate fallback textures for any missing wall textures."""
@@ -131,8 +141,51 @@ class AssetManager:
         self._load_textures_from_directory()
         self._generate_fallback_textures()
         self._generate_fallback_floor_ceiling()
+        self._generate_fallback_sprites()
         
         if 1 in self.textures:
+            self.tex_width = self.textures[1].get_width()
+            self.tex_height = self.textures[1].get_height()
+    
+    def _generate_fallback_sprites(self) -> None:
+        """Generate fallback sprite textures if not loaded."""
+        """AI generated code"""
+        texture_size = settings.assets.texture_size
+        
+        if 0 not in self.sprite_textures:
+            sprite_surface = pygame.Surface((texture_size, texture_size), pygame.SRCALPHA)
+            sprite_surface.fill((0, 0, 0, 0))
+            
+            pygame.draw.circle(
+                sprite_surface,
+                (255, 50, 50),
+                (texture_size // 2, texture_size // 2 - texture_size // 8),
+                texture_size // 8
+            )
+            
+            pygame.draw.circle(
+                sprite_surface,
+                (255, 50, 50),
+                (texture_size // 2, texture_size // 2 + texture_size // 8),
+                texture_size // 4
+            )
+            
+            pygame.draw.circle(
+                sprite_surface,
+                (0, 0, 0),
+                (texture_size // 2 - texture_size // 8, texture_size // 2 - texture_size // 8),
+                texture_size // 16
+            )
+            
+            pygame.draw.circle(
+                sprite_surface,
+                (0, 0, 0),
+                (texture_size // 2 + texture_size // 8, texture_size // 2 - texture_size // 8),
+                texture_size // 16
+            )
+            
+            self.sprite_textures[0] = sprite_surface
+            print("Generated fallback sprite texture")
             self.tex_width = self.textures[1].get_width()
             self.tex_height = self.textures[1].get_height()
     
@@ -155,6 +208,18 @@ class AssetManager:
             NumPy array of the ceiling texture
         """
         return self.ceiling_array
+    
+    def get_sprite_texture(self, sprite_id: int) -> Optional[pygame.Surface]:
+        """Get a sprite texture by ID.
+        
+        Args:
+            sprite_id: The sprite texture ID
+            
+        Returns:
+            Sprite surface or None if not found
+        """
+        return self.sprite_textures.get(sprite_id, self.sprite_textures.get(0))
+    
     
     def _prepare_wall_texture_arrays(self) -> None:
         """Prepare wall textures as a single NumPy array for numba optimization."""

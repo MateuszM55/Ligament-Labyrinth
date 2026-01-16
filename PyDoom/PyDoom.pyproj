@@ -28,6 +28,7 @@
     <Compile Include="engine\raycaster.py" />
     <Compile Include="engine\__init__.py" />
     <Compile Include="world\map.py" />
+    <Compile Include="world\monster.py" />
     <Compile Include="world\player.py" />
     <Compile Include="world\__init__.py" />
   </ItemGroup>

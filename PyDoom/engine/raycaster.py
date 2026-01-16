@@ -131,6 +131,76 @@ class Raycaster:
         )
         
         del screen_pixels
+        
+        self.render_sprites(screen, player, game_map)
+    
+    def render_sprites(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
+        """Render all sprites (monsters) in the scene.
+        
+        Args:
+            screen: Pygame surface to render to
+            player: The player object
+            game_map: The game map containing monsters
+        """
+        if not game_map.monsters:
+            return
+        
+        sprite_data = []
+        for monster in game_map.monsters:
+            distance = monster.get_distance_to_player(player)
+            
+            if distance < 0.1 or distance > self.max_depth:
+                continue
+            
+            sprite_data.append((distance, monster))
+        
+        sprite_data.sort(key=lambda x: x[0], reverse=True)
+        
+        player_rad = math.radians(player.rotation)
+        player_cos = math.cos(player_rad)
+        player_sin = math.sin(player_rad)
+        
+        half_fov = math.radians(self.fov / 2.0)
+        tan_half_fov = math.tan(half_fov)
+        aspect_ratio = self.screen_width / self.screen_height
+        
+        for distance, monster in sprite_data:
+            dx = monster.x - player.x
+            dy = monster.y - player.y
+            
+            sprite_y = dx * player_cos + dy * player_sin
+            sprite_x = dy * player_cos - dx * player_sin
+            
+            if sprite_y <= 0.1:
+                continue
+            
+            projection_plane_x = (sprite_x / sprite_y) / (tan_half_fov * aspect_ratio)
+            screen_x = int((self.screen_width / 2.0) * (1.0 + projection_plane_x))
+            
+            sprite_height = int(self.screen_height / sprite_y * settings.render.wall_height_factor)
+            sprite_width = sprite_height
+            
+            draw_start_y = int((self.screen_height - sprite_height) / 2 + player.bob_offset_y)
+            draw_start_x = int(screen_x - sprite_width / 2)
+            
+            sprite_texture = self.asset_manager.get_sprite_texture(monster.texture_id)
+            if sprite_texture is None:
+                continue
+            
+            if sprite_width > 0 and sprite_height > 0:
+                scaled_sprite = pygame.transform.scale(sprite_texture, (sprite_width, sprite_height))
+                
+                light_factor = 1.0
+                if settings.lighting.enable_inverse_square:
+                    light_factor = min(1.0, settings.lighting.light_intensity / (distance * distance + 0.1))
+                    light_factor = max(settings.lighting.ambient_light, light_factor)
+                
+                if light_factor < 1.0:
+                    dark_surface = pygame.Surface(scaled_sprite.get_size(), pygame.SRCALPHA)
+                    dark_surface.fill((0, 0, 0, int(255 * (1.0 - light_factor))))
+                    scaled_sprite.blit(dark_surface, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+                
+                screen.blit(scaled_sprite, (draw_start_x, draw_start_y))
 
     def render_minimap(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
         """Render 2D minimap overlay.
@@ -169,6 +239,16 @@ class Raycaster:
                         color,
                         (tile_x, tile_y, minimap_scale, minimap_scale)
                     )
+        
+        for monster in game_map.monsters:
+            monster_x = minimap_x + monster.x * minimap_scale
+            monster_y = minimap_y + monster.y * minimap_scale
+            pygame.draw.circle(
+                screen,
+                (255, 100, 100),
+                (int(monster_x), int(monster_y)),
+                3
+            )
         
         player_x = minimap_x + player.x * minimap_scale
         player_y = minimap_y + player.y * minimap_scale

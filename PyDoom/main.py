@@ -42,6 +42,11 @@ class Game:
         start_x, start_y = self.game_map.player_start
         self.player: Player = Player(start_x, start_y, 0.0)
         
+        if len(self.game_map.monsters) == 0:
+            print("No monsters found in map, adding test monsters...")
+            self.game_map.add_monster(5.5, 5.5, 0)
+            self.game_map.add_monster(8.5, 3.5, 0)
+        
         self.asset_manager: AssetManager = AssetManager()
         self.raycaster: Raycaster = Raycaster(
             self.screen_width, 

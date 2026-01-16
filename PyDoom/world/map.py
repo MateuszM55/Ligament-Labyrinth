@@ -5,6 +5,7 @@ from typing import List, Tuple
 import numpy as np
 
 from settings import settings
+from world.monster import Monster
 
 
 class Map:
@@ -39,6 +40,7 @@ class Map:
         """
         grid: List[List[int]] = []
         player_start: Tuple[float, float] = (2.0, 2.0)
+        monsters: List[Monster] = []
         
         try:
             with open(filename, 'r') as file:
@@ -48,11 +50,16 @@ class Map:
                         if char.isdigit():
                             row.append(int(char))
                         elif char.upper() == 'P':
-                            player_start = (float(x), float(y))
+                            player_start = (float(x) + 0.5, float(y) + 0.5)
+                            row.append(0)
+                        elif char.upper() == 'M':
+                            monsters.append(Monster(float(x) + 0.5, float(y) + 0.5, texture_id=0))
                             row.append(0)
                     if row:
                         grid.append(row)
-            return Map(grid, player_start)
+            game_map = Map(grid, player_start)
+            game_map.monsters = monsters
+            return game_map
         except FileNotFoundError:
             print(f"Error: map file '{filename}' not found.")
             sys.exit(1)
@@ -74,3 +81,13 @@ class Map:
             return True
             
         return self.grid[map_y][map_x] > 0
+    
+    def add_monster(self, x: float, y: float, texture_id: int = 0) -> None:
+        """Add a monster to the map.
+        
+        Args:
+            x: X position in world coordinates
+            y: Y position in world coordinates
+            texture_id: Texture ID for the sprite
+        """
+        self.monsters.append(Monster(x, y, texture_id))

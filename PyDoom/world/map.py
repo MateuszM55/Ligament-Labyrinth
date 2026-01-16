@@ -5,6 +5,7 @@ from typing import List, Tuple
 import numpy as np
 
 from settings import settings
+from world.monster import Monster
 
 
 class Map:
@@ -22,6 +23,7 @@ class Map:
         self.height: int = len(grid)
         self.player_start: Tuple[float, float] = player_start
         self.sprite_data: np.ndarray = np.empty((0, 3), dtype=np.float32)
+        self.monsters: List[Monster] = []
         
         self.grid_array: np.ndarray = np.array(grid, dtype=np.int32)
 
@@ -60,6 +62,8 @@ class Map:
             game_map = Map(grid, player_start)
             if sprite_list:
                 game_map.sprite_data = np.array(sprite_list, dtype=np.float32)
+                for sprite_x, sprite_y, texture_id in sprite_list:
+                    game_map.monsters.append(Monster(sprite_x, sprite_y, int(texture_id)))
             return game_map
         except FileNotFoundError:
             print(f"Error: map file '{filename}' not found.")
@@ -96,3 +100,15 @@ class Map:
             self.sprite_data = new_sprite
         else:
             self.sprite_data = np.vstack([self.sprite_data, new_sprite])
+        
+        self.monsters.append(Monster(x, y, texture_id))
+    
+    def update_sprite_data(self) -> None:
+        """Update sprite_data array from monster positions."""
+        if self.monsters:
+            self.sprite_data = np.array(
+                [[m.x, m.y, m.texture_id] for m in self.monsters],
+                dtype=np.float32
+            )
+        else:
+            self.sprite_data = np.empty((0, 3), dtype=np.float32)

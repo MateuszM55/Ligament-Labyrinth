@@ -146,6 +146,19 @@ class Game:
 
         if total_dx != 0 or total_dy != 0:
             self.player._move_with_collision(total_dx, total_dy, self.game_map)
+    
+    def check_monster_collisions(self) -> None:
+        """Check if player collides with any monsters and end game if so."""
+        collision_distance = settings.monster.collision_distance
+        
+        for monster in self.game_map.monsters:
+            dx = self.player.x - monster.x
+            dy = self.player.y - monster.y
+            distance = math.sqrt(dx * dx + dy * dy)
+            
+            if distance < collision_distance:
+                self.running = False
+                break
            
     def update(self, dt: float) -> None:
         """Update game logic.
@@ -156,6 +169,13 @@ class Game:
         if not self.paused:
             self.handle_player_input(dt)
             self.player.update_bobbing(dt)
+            
+            for monster in self.game_map.monsters:
+                monster.move_towards_player(self.player, dt)
+            
+            self.game_map.update_sprite_data()
+            
+            self.check_monster_collisions()
             
     def render(self) -> None:
         """Render everything to the screen."""

@@ -3,6 +3,8 @@
 import math
 from typing import TYPE_CHECKING
 
+from settings import settings
+
 if TYPE_CHECKING:
     from world.player import Player
 
@@ -47,3 +49,22 @@ class Monster:
         dx = player.x - self.x
         dy = player.y - self.y
         return math.sqrt(dx * dx + dy * dy)
+    
+    def move_towards_player(self, player: 'Player', dt: float) -> None:
+        """Move the monster towards the player, ignoring walls.
+        
+        Args:
+            player: The player object
+            dt: Delta time in seconds
+        """
+        dx = player.x - self.x
+        dy = player.y - self.y
+        distance = math.sqrt(dx * dx + dy * dy)
+        
+        if distance > 0:
+            move_speed = settings.monster.move_speed * dt
+            normalized_dx = (dx / distance) * move_speed
+            normalized_dy = (dy / distance) * move_speed
+            
+            self.x += normalized_dx
+            self.y += normalized_dy

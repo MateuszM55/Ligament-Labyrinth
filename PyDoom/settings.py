@@ -39,6 +39,13 @@ class PlayerSettings:
 
 
 @dataclass(frozen=True)
+class MonsterSettings:
+    """Monster/enemy configuration."""
+    move_speed: float = 1.5
+    collision_distance: float = 0.3
+
+
+@dataclass(frozen=True)
 class MapSettings:
     """Map and tile configuration."""
     default_map_file: str = "map.txt"
@@ -112,6 +119,7 @@ class GameSettings:
     display: DisplaySettings = DisplaySettings()
     render: RenderSettings = RenderSettings()
     player: PlayerSettings = PlayerSettings()
+    monster: MonsterSettings = MonsterSettings()
     map: MapSettings = MapSettings()
     assets: AssetSettings = AssetSettings()
     colors: ColorPalette = ColorPalette()

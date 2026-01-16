@@ -58,7 +58,7 @@ class CollectibleSettings:
     """Collectible item configuration."""
     total_count: int = 3
     collection_distance: float = 0.5
-    texture_ids: tuple = (1,2,3)  # Texture IDs for each collectible (use different sprites)
+    texture_ids: tuple = (15,15,15)  # Texture IDs for each collectible
 
 
 @dataclass(frozen=True)

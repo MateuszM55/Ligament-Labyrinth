@@ -7,6 +7,7 @@ import numpy as np
 
 from settings import settings
 from world.monster import Monster
+from world.collectible import Collectible
 
 
 class Map:
@@ -28,6 +29,7 @@ class Map:
         self.player_start: Tuple[float, float] = player_start
         self.sprite_data: np.ndarray = np.empty((0, 3), dtype=np.float32)
         self.monsters: List[Monster] = []
+        self.collectibles: List[Collectible] = []
         
         self.grid_array: np.ndarray = np.array(grid, dtype=np.int32)
         
@@ -58,9 +60,11 @@ class Map:
         grid: List[List[int]] = []
         player_start: Tuple[float, float] = (2.0, 2.0)
         sprite_list: List[Tuple[float, float, int]] = []
+        collectible_list: List[Tuple[float, float, int]] = []
         
         try:
             with open(filename, 'r') as file:
+                collectible_index = 0
                 for y, line in enumerate(file):
                     row: List[int] = []
                     for x, char in enumerate(line.strip()):
@@ -71,6 +75,12 @@ class Map:
                             row.append(0)
                         elif char.upper() == 'M':
                             sprite_list.append((float(x) + 0.5, float(y) + 0.5, random.randint(0, 10)))
+                            row.append(0)
+                        elif char.upper() == 'C':
+                            # Use different texture IDs for each collectible
+                            texture_id = settings.collectible.texture_ids[collectible_index % len(settings.collectible.texture_ids)]
+                            collectible_list.append((float(x) + 0.5, float(y) + 0.5, texture_id))
+                            collectible_index += 1
                             row.append(0)
                     if row:
                         grid.append(row)
@@ -91,6 +101,9 @@ class Map:
                 game_map.sprite_data = np.array(sprite_list, dtype=np.float32)
                 for sprite_x, sprite_y, texture_id in sprite_list:
                     game_map.monsters.append(Monster(sprite_x, sprite_y, int(texture_id)))
+            if collectible_list:
+                for coll_x, coll_y, texture_id in collectible_list:
+                    game_map.collectibles.append(Collectible(coll_x, coll_y, int(texture_id)))
             return game_map
         except FileNotFoundError:
             print(f"Error: map file '{filename}' not found.")
@@ -161,11 +174,19 @@ class Map:
         self.monsters.append(Monster(x, y, texture_id))
     
     def update_sprite_data(self) -> None:
-        """Update sprite_data array from monster positions."""
-        if self.monsters:
-            self.sprite_data = np.array(
-                [[m.x, m.y, m.texture_id] for m in self.monsters],
-                dtype=np.float32
-            )
+        """Update sprite_data array from monster and collectible positions."""
+        sprite_list = []
+        
+        # Add all monsters
+        for m in self.monsters:
+            sprite_list.append([m.x, m.y, m.texture_id])
+        
+        # Add uncollected collectibles
+        for c in self.collectibles:
+            if not c.collected:
+                sprite_list.append([c.x, c.y, c.texture_id])
+        
+        if sprite_list:
+            self.sprite_data = np.array(sprite_list, dtype=np.float32)
         else:
             self.sprite_data = np.empty((0, 3), dtype=np.float32)

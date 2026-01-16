@@ -23,6 +23,7 @@ class Monster:
         self.x: float = float(x)
         self.y: float = float(y)
         self.texture_id: int = texture_id
+        self.speed_multiplier: float = 1.0
         
     def get_angle_to_player(self, player: 'Player') -> float:
         """Calculate the angle from monster to player (for billboarding).
@@ -62,9 +63,10 @@ class Monster:
         distance = math.sqrt(dx * dx + dy * dy)
         
         if distance > 0:
-            move_speed = settings.monster.move_speed * dt
+            move_speed = settings.monster.move_speed * self.speed_multiplier * dt
             normalized_dx = (dx / distance) * move_speed
             normalized_dy = (dy / distance) * move_speed
             
             self.x += normalized_dx
             self.y += normalized_dy
+

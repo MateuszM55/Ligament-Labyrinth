@@ -35,6 +35,9 @@ class Game:
         
         self.show_fps: bool = settings.show_fps
         
+        self.collectibles_obtained: int = 0
+        self.all_collectibles_obtained: bool = False
+        
         pygame.event.set_grab(True)
         pygame.mouse.set_visible(False)
         
@@ -163,6 +166,21 @@ class Game:
             if distance < collision_distance:
                 self.running = False
                 break
+    
+    def check_collectible_collisions(self) -> None:
+        """Check if player collects any collectibles."""
+        collection_distance = settings.collectible.collection_distance
+        
+        for collectible in self.game_map.collectibles:
+            if collectible.check_collection(self.player, collection_distance):
+                self.collectibles_obtained += 1
+                
+                # Check if all collectibles are obtained
+                if self.collectibles_obtained >= settings.collectible.total_count:
+                    self.all_collectibles_obtained = True
+                    # Speed up all monsters
+                    for monster in self.game_map.monsters:
+                        monster.speed_multiplier = settings.monster.speed_boost_multiplier
            
     def update(self, dt: float) -> None:
         """Update game logic.
@@ -180,6 +198,8 @@ class Game:
                 monster.move_towards_player(self.player, dt)
             
             self.audio_manager.update_all_monster_sounds(self.game_map.monsters, self.player)
+            
+            self.check_collectible_collisions()
             
             self.game_map.update_sprite_data()
             

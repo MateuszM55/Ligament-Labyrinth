@@ -43,6 +43,15 @@ class MonsterSettings:
     """Monster/enemy configuration."""
     move_speed: float = 1.5
     collision_distance: float = 0.3
+    speed_boost_multiplier: float = 3.0  # Speed multiplier when all collectibles are obtained
+
+
+@dataclass(frozen=True)
+class CollectibleSettings:
+    """Collectible item configuration."""
+    total_count: int = 3
+    collection_distance: float = 0.5
+    texture_ids: tuple = (1,2,3)  # Texture IDs for each collectible (use different sprites)
 
 
 @dataclass(frozen=True)
@@ -143,6 +152,7 @@ class GameSettings:
     render: RenderSettings = RenderSettings()
     player: PlayerSettings = PlayerSettings()
     monster: MonsterSettings = MonsterSettings()
+    collectible: CollectibleSettings = CollectibleSettings()
     map: MapSettings = MapSettings()
     assets: AssetSettings = AssetSettings()
     colors: ColorPalette = ColorPalette()

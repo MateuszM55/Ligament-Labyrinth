@@ -308,7 +308,7 @@ def render_walls_numba(
     enable_vignette: bool,
     vignette_intensity: float,
     vignette_radius: float
-) -> None:
+) -> np.ndarray:
     """Render walls using Numba optimization with advanced horror lighting.
     
     Args:
@@ -335,6 +335,9 @@ def render_walls_numba(
         enable_vignette: Enable screen edge vignette
         vignette_intensity: Vignette darkness (0-1)
         vignette_radius: Vignette start radius (0-1)
+        
+    Returns:
+        Depth buffer array of shape (screen_width,) with distance for each column
     """
     half_fov_rad = math.radians(fov / 2.0)
     tan_half_fov = math.tan(half_fov_rad)
@@ -343,6 +346,8 @@ def render_walls_numba(
     
     tex_width = texture_arrays.shape[1]
     tex_height = texture_arrays.shape[2]
+    
+    depth_buffer = np.full(screen_width, max_depth, dtype=np.float32)
     
     for ray_index in range(num_rays):
         screen_x = (2.0 * ray_index) / num_rays - 1.0
@@ -404,8 +409,12 @@ def render_walls_numba(
         x_end = min(x_end, screen_width)
         
         
+        
         if wall_height > 0 and wall_height < 8000:
             for screen_x_pos in range(x_start, x_end):
+                # Store distance in depth buffer for occlusion testing
+                depth_buffer[screen_x_pos] = distance
+                
                 # Calculate vignette effect (per-pixel screen position)
                 for screen_y_pos in range(max(0, wall_top), min(screen_height, wall_top + wall_height)):
                     vignette_multiplier = 1.0
@@ -438,6 +447,8 @@ def render_walls_numba(
                     screen_pixels[screen_x_pos, screen_y_pos, 0] = r
                     screen_pixels[screen_x_pos, screen_y_pos, 1] = g
                     screen_pixels[screen_x_pos, screen_y_pos, 2] = b
+    
+    return depth_buffer
 
 
 @numba.njit(fastmath=True)
@@ -454,9 +465,11 @@ def process_sprites_numba(
     bob_offset_y: float,
     enable_inverse_square: bool,
     light_intensity: float,
-    ambient_light: float
+    ambient_light: float,
+    depth_buffer: np.ndarray,
+    collectible_texture_ids: tuple
 ) -> np.ndarray:
-    """Process sprite rendering with Numba optimization.
+    """Process sprite rendering with Numba optimization and depth buffer occlusion for collectibles only.
     
     Args:
         sprite_data: Array of shape (N, 3) with [x, y, texture_id] for each sprite
@@ -472,6 +485,8 @@ def process_sprites_numba(
         enable_inverse_square: Use inverse square law for lighting
         light_intensity: Base light power
         ambient_light: Minimum light level (0-1)
+        depth_buffer: Array of shape (screen_width,) with wall distances for occlusion
+        collectible_texture_ids: Tuple of texture IDs that should be occluded by walls
         
     Returns:
         Array of shape (M, 6) with [screen_x, sprite_height, sprite_width, distance, texture_id, light_factor]
@@ -518,6 +533,31 @@ def process_sprites_numba(
         
         if screen_x + sprite_width / 2 < 0 or screen_x - sprite_width / 2 > screen_width:
             continue
+        
+        # Check depth buffer for occlusion - ONLY for collectibles, not monsters
+        is_collectible = False
+        for coll_tex_id in collectible_texture_ids:
+            if texture_id == coll_tex_id:
+                is_collectible = True
+                break
+        
+        if is_collectible:
+            # Check if collectible is behind walls
+            sprite_left = int(max(0, screen_x - sprite_width / 2))
+            sprite_right = int(min(screen_width - 1, screen_x + sprite_width / 2))
+            
+            # Check if sprite is behind walls for most of its width
+            occluded_count = 0
+            checked_count = 0
+            for check_x in range(sprite_left, sprite_right + 1):
+                if check_x >= 0 and check_x < screen_width:
+                    checked_count += 1
+                    if depth_buffer[check_x] < sprite_y:  # sprite_y is the perpendicular distance
+                        occluded_count += 1
+            
+            # If more than 70% of sprite width is occluded, skip it
+            if checked_count > 0 and occluded_count / checked_count > 0.7:
+                continue
         
         if sprite_height > 0 and sprite_height < 10000:
             light_factor = 1.0

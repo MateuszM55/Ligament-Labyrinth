@@ -109,7 +109,7 @@ class Raycaster:
         texture_arrays = self.asset_manager.get_wall_texture_arrays()
         texture_map = self.asset_manager.get_texture_map()
         
-        render_walls_numba(
+        depth_buffer = render_walls_numba(
             screen_pixels,
             texture_arrays,
             texture_map,
@@ -137,15 +137,16 @@ class Raycaster:
         
         del screen_pixels
         
-        self.render_sprites(screen, player, game_map)
+        self.render_sprites(screen, player, game_map, depth_buffer)
     
-    def render_sprites(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
-        """Render all sprites (monsters) in the scene using Numba optimization.
+    def render_sprites(self, screen: pygame.Surface, player: Player, game_map: Map, depth_buffer: np.ndarray) -> None:
+        """Render all sprites (monsters) in the scene using Numba optimization with depth buffer occlusion for collectibles.
         
         Args:
             screen: Pygame surface to render to
             player: The player object
             game_map: The game map containing sprite data
+            depth_buffer: Array of wall distances for occlusion testing
         """
         if game_map.sprite_data.shape[0] == 0:
             return
@@ -163,7 +164,9 @@ class Raycaster:
             player.bob_offset_y,
             settings.lighting.enable_inverse_square,
             settings.lighting.light_intensity,
-            settings.lighting.ambient_light
+            settings.lighting.ambient_light,
+            depth_buffer,
+            settings.collectible.texture_ids
         )
         
         for i in range(processed_sprites.shape[0]):

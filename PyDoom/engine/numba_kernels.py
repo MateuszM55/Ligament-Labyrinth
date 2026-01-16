@@ -267,10 +267,6 @@ def render_walls_numba(
     ray_width: float,
     bob_offset_y: float,
     wall_height_factor: float,
-    enable_flashlight: bool,
-    flashlight_radius: float,
-    flashlight_intensity: float,
-    flashlight_sharpness: float,
     enable_inverse_square: bool,
     light_intensity: float,
     ambient_light: float,
@@ -298,10 +294,6 @@ def render_walls_numba(
         ray_width: Width of each ray column in pixels
         bob_offset_y: View bobbing offset
         wall_height_factor: Multiplier for wall height calculation
-        enable_flashlight: Enable flashlight radial falloff
-        flashlight_radius: Flashlight beam radius (0-1)
-        flashlight_intensity: Flashlight edge darkening (0-1)
-        flashlight_sharpness: Flashlight falloff sharpness
         enable_inverse_square: Use inverse square law for distance
         light_intensity: Base light power for inverse square
         ambient_light: Minimum light level (0-1)
@@ -379,17 +371,6 @@ def render_walls_numba(
         
         if wall_height > 0 and wall_height < 8000:
             for screen_x_pos in range(x_start, x_end):
-                # Calculate flashlight effect (radial falloff from center)
-                flashlight_multiplier = 1.0
-                if enable_flashlight:
-                    x_norm = (screen_x_pos - screen_width / 2.0) / (screen_width / 2.0)
-                    radial_dist = abs(x_norm)
-                    
-                    if radial_dist > flashlight_radius:
-                        falloff = (radial_dist - flashlight_radius) / (1.0 - flashlight_radius + 0.001)
-                        falloff = min(1.0, falloff ** flashlight_sharpness)
-                        flashlight_multiplier = 1.0 - (falloff * flashlight_intensity)
-                
                 # Calculate vignette effect (per-pixel screen position)
                 for screen_y_pos in range(max(0, wall_top), min(screen_height, wall_top + wall_height)):
                     vignette_multiplier = 1.0
@@ -404,7 +385,7 @@ def render_walls_numba(
                             vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
                     
                     # Combine all lighting effects
-                    final_lighting = lighting_multiplier * flashlight_multiplier * vignette_multiplier
+                    final_lighting = lighting_multiplier * vignette_multiplier
                     final_lighting = max(0.0, min(1.0, final_lighting))
                     
                     y_ratio = (screen_y_pos - wall_top) / wall_height

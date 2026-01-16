@@ -91,15 +91,9 @@ class MinimapSettings:
 @dataclass(frozen=True)
 class LightingSettings:
     """Advanced lighting configuration for horror atmosphere."""
-    # Flashlight effect (radial falloff)
-    enable_flashlight: bool = False
-    flashlight_radius: float = 0.7  # 0.0 = narrow beam, 1.0 = wide beam
-    flashlight_intensity: float = 0.1  # How much darker everthing outside the flashlight is (0-1)
-    flashlight_sharpness: float = 0.0  # Higher = sharper falloff and shorter reach
-    
     # Inverse square law (distance falloff)
     enable_inverse_square: bool = True
-    light_intensity: float = 0.7  # Base light power that emits from the player
+    light_intensity: float = 1  # Base light power that emits from the player
     ambient_light: float = 0.03  # Minimum light level everywhere (0-1)
     
     # Vignette effect

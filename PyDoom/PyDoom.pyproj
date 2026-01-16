@@ -41,7 +41,6 @@
     <Content Include="ceiling_map.txt" />
     <Content Include="floor_map.txt" />
     <Content Include="map.txt" />
-    <Content Include="map_ceiling.txt" />
     <Content Include="requirements.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />

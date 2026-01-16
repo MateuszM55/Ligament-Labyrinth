@@ -57,10 +57,10 @@ class Raycaster:
         """Render floor and ceiling using Numba-optimized operations.
         
         Args:
-            screen: Pygame surface to render to
-            player: The player object
-            game_map: The game map
-            glitch_intensity: Dynamic glitch effect intensity
+            screen: Surface to render to
+            player: Player object
+            game_map: Game map
+            glitch_intensity: Glitch effect intensity (0.0 = off)
         """
         floor_arrays = self.asset_manager.get_floor_arrays()
         ceiling_arrays = self.asset_manager.get_ceiling_arrays()
@@ -104,13 +104,13 @@ class Raycaster:
         screen.blit(scaled_surf, (0, 0))
                   
     def render_3d_view_numba(self, screen: pygame.Surface, player: Player, game_map: Map, glitch_intensity: float = 0.0) -> None:
-        """Render the complete 3D view using Numba optimization for walls.
+        """Render the complete 3D view using Numba optimization.
         
         Args:
-            screen: Pygame surface to render to
-            player: The player object
-            game_map: The game map
-            glitch_intensity: Dynamic glitch effect intensity
+            screen: Surface to render to
+            player: Player object
+            game_map: Game map
+            glitch_intensity: Glitch effect intensity (0.0 = off)
         """
         self.render_floor_ceiling_vectorized(screen, player, game_map, glitch_intensity)
         
@@ -151,13 +151,13 @@ class Raycaster:
         self.render_sprites(screen, player, game_map, depth_buffer)
     
     def render_sprites(self, screen: pygame.Surface, player: Player, game_map: Map, depth_buffer: np.ndarray) -> None:
-        """Render all sprites (monsters) in the scene using Numba optimization with depth buffer occlusion for collectibles.
+        """Render all sprites (monsters and collectibles) with depth buffer occlusion.
         
         Args:
-            screen: Pygame surface to render to
-            player: The player object
-            game_map: The game map containing sprite data
-            depth_buffer: Array of wall distances for occlusion testing
+            screen: Surface to render to
+            player: Player object
+            game_map: Game map containing sprite data
+            depth_buffer: Wall distances for occlusion testing
         """
         if game_map.sprite_data.shape[0] == 0:
             return
@@ -209,9 +209,9 @@ class Raycaster:
         """Render 2D minimap overlay.
         
         Args:
-            screen: Pygame surface to render to
-            player: The player object
-            game_map: The game map
+            screen: Surface to render to
+            player: Player object
+            game_map: Game map
         """
         minimap_size = settings.minimap.size
         minimap_scale = minimap_size / max(game_map.width, game_map.height)

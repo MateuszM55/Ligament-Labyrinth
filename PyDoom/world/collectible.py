@@ -3,12 +3,14 @@
 import math
 from typing import TYPE_CHECKING
 
+from world.entity_utils import distance_to_player, distance_squared_to_player
+
 if TYPE_CHECKING:
     from world.player import Player
 
 
 class Collectible:
-    """Represents a collectible sprite in the game world."""
+    """Represents a collectible item in the game world."""
     
     def __init__(self, x: float, y: float, texture_id: int = 11) -> None:
         """Initialize the collectible.
@@ -22,49 +24,45 @@ class Collectible:
         self.y: float = float(y)
         self.texture_id: int = texture_id
         self.collected: bool = False
-        
+    
     def get_distance_to_player(self, player: 'Player') -> float:
         """Calculate distance from collectible to player.
         
         Args:
-            player: The player object
+            player: Player object
             
         Returns:
             Distance in world units
         """
-        dx = player.x - self.x
-        dy = player.y - self.y
-        return math.sqrt(dx * dx + dy * dy)
+        return distance_to_player(self.x, self.y, player)
     
     def get_distance_squared_to_player(self, player: 'Player') -> float:
         """Calculate squared distance from collectible to player (faster, no sqrt).
         
         Args:
-            player: The player object
+            player: Player object
             
         Returns:
             Squared distance in world units
         """
-        dx = player.x - self.x
-        dy = player.y - self.y
-        return dx * dx + dy * dy
+        return distance_squared_to_player(self.x, self.y, player)
+    
     
     def check_collection(self, player: 'Player', collection_distance: float) -> bool:
         """Check if player is close enough to collect this item.
         
         Args:
-            player: The player object
+            player: Player object
             collection_distance: Distance threshold for collection
             
         Returns:
-            True if collected, False otherwise
+            True if item was collected, False otherwise
         """
         if self.collected:
             return False
         
         # Use squared distance to avoid expensive sqrt
-        distance_squared = self.get_distance_squared_to_player(player)
-        if distance_squared < collection_distance * collection_distance:
+        if self.get_distance_squared_to_player(player) < collection_distance ** 2:
             self.collected = True
             return True
         return False

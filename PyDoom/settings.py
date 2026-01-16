@@ -55,7 +55,7 @@ class MapSettings:
 class AssetSettings:
     """Asset loading configuration."""
     texture_directory: str = "textures"
-    texture_size: int = 64
+    texture_size: int = 128
     
     default_texture_colors: dict = None
     

@@ -259,7 +259,8 @@ class Game:
         # Pass dynamic glitch intensity to renderer
         self.raycaster.render_3d_view_numba(self.screen, self.player, self.game_map, self.current_glitch_intensity)
         
-        self.raycaster.render_minimap(self.screen, self.player, self.game_map)
+        if settings.minimap.enabled:
+            self.raycaster.render_minimap(self.screen, self.player, self.game_map)
         
         if self.show_fps:
             fps_text = self.font.render(

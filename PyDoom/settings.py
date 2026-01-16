@@ -108,6 +108,7 @@ class ColorPalette:
 @dataclass(frozen=True)
 class MinimapSettings:
     """Minimap rendering configuration."""
+    enabled: bool = True
     size: int = 150
     margin: int = 10
     player_dot_radius: int = 3

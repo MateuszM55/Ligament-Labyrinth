@@ -96,10 +96,10 @@ class LightingSettings:
     light_intensity: float = 1  # Base light power that emits from the player
     ambient_light: float = 0.03  # Minimum light level everywhere (0-1)
     
-    # Vignette effect
-    enable_vignette: bool = False
-    vignette_intensity: float = 1  # 0-1, how dark the edges get
-    vignette_radius: float = 0.1  # 0-1, where vignette starts
+    # Vignette effect (darkens screen edges for tunnel vision/horror effect)
+    enable_vignette: bool = True
+    vignette_intensity: float = 1  # 0-1, multiplier for edge darkening (0=no effect, 1=maximum darkness at edges)
+    vignette_radius: float = 0.5  # Size of the clear center 'circle' (0 = whole screen is dark, 1 = effect only visible at edges)
 
 
 @dataclass(frozen=True)

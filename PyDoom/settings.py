@@ -7,8 +7,8 @@ from typing import Tuple
 @dataclass(frozen=True)
 class DisplaySettings:
     """Display and screen configuration."""
-    width: int = 854
-    height: int = 480
+    width: int = 1280
+    height: int = 720
     fps: int = 144
     title: str = "PyDoom"
 

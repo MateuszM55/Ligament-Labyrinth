@@ -16,10 +16,11 @@ class DisplaySettings:
 @dataclass(frozen=True)
 class RenderSettings:
     """Raycasting and rendering configuration."""
-    fov: float = 90.0
+    fov: float = 60.0
     max_depth: float = 100.0
     wall_ray_resolution_divisor: int = 1
     floor_and_ceiling_scale: int = 1
+    wall_height_factor: float = 1
 
 
 @dataclass(frozen=True)
@@ -91,18 +92,18 @@ class MinimapSettings:
 class LightingSettings:
     """Advanced lighting configuration for horror atmosphere."""
     # Flashlight effect (radial falloff)
-    enable_flashlight: bool = True
-    flashlight_radius: float = 0.4  # 0.0 = narrow beam, 1.0 = wide beam
-    flashlight_intensity: float = 0  # How much darker the edges are (0-1)
-    flashlight_sharpness: float = 2.0  # Higher = sharper falloff
+    enable_flashlight: bool = False
+    flashlight_radius: float = 0.7  # 0.0 = narrow beam, 1.0 = wide beam
+    flashlight_intensity: float = 0.1  # How much darker everthing outside the flashlight is (0-1)
+    flashlight_sharpness: float = 0.0  # Higher = sharper falloff and shorter reach
     
     # Inverse square law (distance falloff)
     enable_inverse_square: bool = True
-    light_intensity: float = 3  # Base light power
-    ambient_light: float = 0.03  # Minimum light level (0-1)
+    light_intensity: float = 0.7  # Base light power that emits from the player
+    ambient_light: float = 0.03  # Minimum light level everywhere (0-1)
     
     # Vignette effect
-    enable_vignette: bool = True
+    enable_vignette: bool = False
     vignette_intensity: float = 1  # 0-1, how dark the edges get
     vignette_radius: float = 0.1  # 0-1, where vignette starts
 

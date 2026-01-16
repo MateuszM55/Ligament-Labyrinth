@@ -129,6 +129,7 @@ def render_floor_ceiling_numba(
     player_rotation_rad: float,
     fov_rad: float,
     bob_offset_y: float,
+    wall_height_factor: float,
     enable_inverse_square: bool,
     light_intensity: float,
     ambient_light: float,
@@ -152,6 +153,7 @@ def render_floor_ceiling_numba(
         player_rotation_rad: Player rotation in radians
         fov_rad: Field of view in radians
         bob_offset_y: View bobbing offset
+        wall_height_factor: Multiplier for wall height calculation
         enable_inverse_square: Use inverse square law for distance
         light_intensity: Base light power for inverse square
         ambient_light: Minimum light level (0-1)
@@ -175,7 +177,7 @@ def render_floor_ceiling_numba(
     plane_x = -player_sin * tan_half_fov * aspect_ratio
     plane_y = player_cos * tan_half_fov * aspect_ratio
     
-    pos_z = 0.5 * screen_height
+    pos_z = 0.5 * screen_height * wall_height_factor
     epsilon = 1.0
     
     
@@ -264,6 +266,7 @@ def render_walls_numba(
     num_rays: int,
     ray_width: float,
     bob_offset_y: float,
+    wall_height_factor: float,
     enable_flashlight: bool,
     flashlight_radius: float,
     flashlight_intensity: float,
@@ -294,6 +297,7 @@ def render_walls_numba(
         num_rays: Number of rays to cast
         ray_width: Width of each ray column in pixels
         bob_offset_y: View bobbing offset
+        wall_height_factor: Multiplier for wall height calculation
         enable_flashlight: Enable flashlight radial falloff
         flashlight_radius: Flashlight beam radius (0-1)
         flashlight_intensity: Flashlight edge darkening (0-1)
@@ -332,7 +336,7 @@ def render_walls_numba(
         if distance < 0.01:
             distance = 0.01
         
-        wall_height = int(screen_height / distance)
+        wall_height = int((screen_height * wall_height_factor) / distance)
         wall_top = int(screen_half - (wall_height / 2.0))
         
         if side == 0:

@@ -48,9 +48,25 @@ class AssetManager:
         pygame.draw.rect(surface, color2, (size // 2, size // 2, size // 2, size // 2))
         return surface
     
+    def _ensure_power_of_two_size(self, surface: pygame.Surface, target_size: int) -> pygame.Surface:
+        """Ensure texture is power-of-2 size for optimal Numba performance.
+        
+        Args:
+            surface: Original surface
+            target_size: Target power-of-2 size (e.g., 64, 128, 256)
+            
+        Returns:
+            Resized surface if needed, otherwise original surface
+        """
+        width, height = surface.get_size()
+        if width != target_size or height != target_size:
+            return pygame.transform.scale(surface, (target_size, target_size))
+        return surface
+    
     def _load_textures_from_directory(self) -> None:
         """Load all textures from the texture directory."""
         texture_dir = settings.assets.texture_directory
+        texture_size = settings.assets.texture_size
         
         if not os.path.exists(texture_dir):
             print(f"Warning: Texture directory '{texture_dir}' not found.")
@@ -67,7 +83,9 @@ class AssetManager:
                 if match:
                     try:
                         sprite_id = int(match.group(1))
+                        # Immediate format conversion for faster NumPy conversion later
                         sprite_surface = pygame.image.load(full_path).convert_alpha()
+                        sprite_surface = self._ensure_power_of_two_size(sprite_surface, texture_size)
                         self.sprite_textures[sprite_id] = sprite_surface
                         print(f"Loaded sprite texture {sprite_id} from {filename}")
                     except pygame.error as e:
@@ -77,7 +95,9 @@ class AssetManager:
                 if match:
                     try:
                         floor_id = int(match.group(1))
+                        # Immediate format conversion for faster NumPy conversion
                         floor_surface = pygame.image.load(full_path).convert()
+                        floor_surface = self._ensure_power_of_two_size(floor_surface, texture_size)
                         self.floor_textures[floor_id] = pygame.surfarray.array3d(floor_surface)
                         print(f"Loaded floor texture {floor_id} from {filename}")
                     except pygame.error as e:
@@ -87,7 +107,9 @@ class AssetManager:
                 if match:
                     try:
                         ceiling_id = int(match.group(1))
+                        # Immediate format conversion for faster NumPy conversion
                         ceiling_surface = pygame.image.load(full_path).convert()
+                        ceiling_surface = self._ensure_power_of_two_size(ceiling_surface, texture_size)
                         self.ceiling_textures[ceiling_id] = pygame.surfarray.array3d(ceiling_surface)
                         print(f"Loaded ceiling texture {ceiling_id} from {filename}")
                     except pygame.error as e:
@@ -97,7 +119,10 @@ class AssetManager:
                 if match:
                     try:
                         tex_id = int(match.group(1))
-                        self.textures[tex_id] = pygame.image.load(full_path).convert()
+                        # Immediate format conversion for faster NumPy conversion
+                        wall_surface = pygame.image.load(full_path).convert()
+                        wall_surface = self._ensure_power_of_two_size(wall_surface, texture_size)
+                        self.textures[tex_id] = wall_surface
                         print(f"Loaded texture {tex_id} from {filename}")
                     except pygame.error as e:
                         print(f"Failed to load texture {filename}: {e}")

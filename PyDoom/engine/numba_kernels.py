@@ -114,7 +114,7 @@ def cast_ray_numba(
     return distance, side, ray_dx, ray_dy, hit_val
 
 
-@numba.njit(fastmath=True, parallel=False)
+@numba.njit(fastmath=True, parallel=True)
 def render_floor_ceiling_numba(
     buffer_pixels: np.ndarray,
     floor_arrays: np.ndarray,
@@ -183,6 +183,10 @@ def render_floor_ceiling_numba(
     ceiling_tex_width = ceiling_arrays.shape[1]
     ceiling_tex_height = ceiling_arrays.shape[2]
     
+    # Precompute texture mask for bitwise AND (assumes power-of-2 textures)
+    floor_tex_mask = floor_tex_width - 1
+    ceiling_tex_mask = ceiling_tex_width - 1
+    
     player_cos = math.cos(player_rotation_rad)
     player_sin = math.sin(player_rotation_rad)
     
@@ -192,8 +196,8 @@ def render_floor_ceiling_numba(
     pos_z = 0.5 * screen_height * wall_height_factor
     epsilon = 1.0
     
-    
-    for y in range(floor_height):
+    # Parallelize the outer loop across CPU cores
+    for y in numba.prange(floor_height):
         for x in range(floor_width):
             screen_y = y * floor_scale
             screen_x = x * floor_scale
@@ -262,13 +266,9 @@ def render_floor_ceiling_numba(
                 if floor_tex_id >= num_floor_textures:
                     floor_tex_id = 0
                 
-                tex_x = int(world_x * floor_tex_width) % floor_tex_width
-                tex_y = int(world_y * floor_tex_height) % floor_tex_height
-                
-                if tex_x < 0:
-                    tex_x += floor_tex_width
-                if tex_y < 0:
-                    tex_y += floor_tex_height
+                # Use bitwise AND for texture wrapping (faster than modulo)
+                tex_x = int(world_x * floor_tex_width) & floor_tex_mask
+                tex_y = int(world_y * floor_tex_height) & floor_tex_mask
                 
                 # Apply lighting with potential wrapping for glitch effect
                 if glitch_intensity > 0:
@@ -299,13 +299,9 @@ def render_floor_ceiling_numba(
                 if ceiling_tex_id >= num_ceiling_textures:
                     ceiling_tex_id = 0
                 
-                tex_x = int(world_x * ceiling_tex_width) % ceiling_tex_width
-                tex_y = int(world_y * ceiling_tex_height) % ceiling_tex_height
-                
-                if tex_x < 0:
-                    tex_x += ceiling_tex_width
-                if tex_y < 0:
-                    tex_y += ceiling_tex_height
+                # Use bitwise AND for texture wrapping (faster than modulo)
+                tex_x = int(world_x * ceiling_tex_width) & ceiling_tex_mask
+                tex_y = int(world_y * ceiling_tex_height) & ceiling_tex_mask
                 
                 # Apply lighting with potential wrapping for glitch effect
                 if glitch_intensity > 0:
@@ -330,7 +326,7 @@ def render_floor_ceiling_numba(
                     buffer_pixels[x, y, 2] = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 2] * final_lighting)
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, parallel=True)
 def render_walls_numba(
     screen_pixels: np.ndarray,
     texture_arrays: np.ndarray,
@@ -396,9 +392,13 @@ def render_walls_numba(
     tex_width = texture_arrays.shape[1]
     tex_height = texture_arrays.shape[2]
     
+    # Precompute texture mask for bitwise AND (assumes power-of-2 textures)
+    tex_mask = tex_width - 1
+    
     depth_buffer = np.full(screen_width, max_depth, dtype=np.float32)
     
-    for ray_index in range(num_rays):
+    # Parallelize ray casting across CPU cores
+    for ray_index in numba.prange(num_rays):
         screen_x = (2.0 * ray_index) / num_rays - 1.0
         angle_offset_rad = math.atan(screen_x * tan_half_fov * aspect_ratio)
         angle_offset_deg = math.degrees(angle_offset_rad)

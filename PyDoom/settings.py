@@ -122,7 +122,7 @@ class AudioSettings:
     # Volume levels (0.0 to 1.0)
     master_volume: float = 1.0
     music_volume: float = 1
-    sfx_volume: float = 0.7
+    sfx_volume: float = 0.2
     
     # Footstep settings
     footstep_interval: float = 0.4  # Time between footstep sounds in seconds (walking)

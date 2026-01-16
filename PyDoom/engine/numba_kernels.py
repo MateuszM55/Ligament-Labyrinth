@@ -129,9 +129,6 @@ def render_floor_ceiling_numba(
     player_rotation_rad: float,
     fov_rad: float,
     bob_offset_y: float,
-    floor_fog_intensity: float,
-    ceiling_fog_intensity: float,
-    fog_distance: float,
     enable_inverse_square: bool,
     light_intensity: float,
     ambient_light: float,
@@ -155,9 +152,6 @@ def render_floor_ceiling_numba(
         player_rotation_rad: Player rotation in radians
         fov_rad: Field of view in radians
         bob_offset_y: View bobbing offset
-        floor_fog_intensity: Floor fog intensity (0-1)
-        ceiling_fog_intensity: Ceiling fog intensity (0-1)
-        fog_distance: Base fog distance
         enable_inverse_square: Use inverse square law for distance
         light_intensity: Base light power for inverse square
         ambient_light: Minimum light level (0-1)
@@ -208,7 +202,6 @@ def render_floor_ceiling_numba(
                 distance_factor = light_intensity / (row_distance * row_distance + 0.1)
                 distance_factor = max(ambient_light, min(1.0, distance_factor))
             else:
-                fog_factor = min(row_distance / fog_distance, 1.0)
                 distance_factor = 1.0
             
             # Calculate vignette effect
@@ -223,13 +216,10 @@ def render_floor_ceiling_numba(
                     vignette_falloff = min(1.0, vignette_falloff)
                     vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
             
+            # Combine lighting effects
+            final_lighting = distance_factor * vignette_multiplier
+            
             if p > epsilon:
-                if enable_inverse_square:
-                    floor_fog = distance_factor * vignette_multiplier
-                else:
-                    fog_factor = min(row_distance / fog_distance, 1.0)
-                    floor_fog = (1.0 - fog_factor * floor_fog_intensity) * vignette_multiplier
-                
                 tex_x = int(world_x * floor_tex_width) % floor_tex_width
                 tex_y = int(world_y * floor_tex_height) % floor_tex_height
                 
@@ -238,17 +228,11 @@ def render_floor_ceiling_numba(
                 if tex_y < 0:
                     tex_y += floor_tex_height
                 
-                buffer_pixels[x, y, 0] = int(floor_array[tex_x, tex_y, 0] * floor_fog)
-                buffer_pixels[x, y, 1] = int(floor_array[tex_x, tex_y, 1] * floor_fog)
-                buffer_pixels[x, y, 2] = int(floor_array[tex_x, tex_y, 2] * floor_fog)
+                buffer_pixels[x, y, 0] = int(floor_array[tex_x, tex_y, 0] * final_lighting)
+                buffer_pixels[x, y, 1] = int(floor_array[tex_x, tex_y, 1] * final_lighting)
+                buffer_pixels[x, y, 2] = int(floor_array[tex_x, tex_y, 2] * final_lighting)
             
             elif p < -epsilon:
-                if enable_inverse_square:
-                    ceiling_fog = distance_factor * vignette_multiplier
-                else:
-                    fog_factor = min(row_distance / fog_distance, 1.0)
-                    ceiling_fog = (1.0 - fog_factor * ceiling_fog_intensity) * vignette_multiplier
-                
                 tex_x = int(world_x * ceiling_tex_width) % ceiling_tex_width
                 tex_y = int(world_y * ceiling_tex_height) % ceiling_tex_height
                 
@@ -257,9 +241,9 @@ def render_floor_ceiling_numba(
                 if tex_y < 0:
                     tex_y += ceiling_tex_height
                 
-                buffer_pixels[x, y, 0] = int(ceiling_array[tex_x, tex_y, 0] * ceiling_fog)
-                buffer_pixels[x, y, 1] = int(ceiling_array[tex_x, tex_y, 1] * ceiling_fog)
-                buffer_pixels[x, y, 2] = int(ceiling_array[tex_x, tex_y, 2] * ceiling_fog)
+                buffer_pixels[x, y, 0] = int(ceiling_array[tex_x, tex_y, 0] * final_lighting)
+                buffer_pixels[x, y, 1] = int(ceiling_array[tex_x, tex_y, 1] * final_lighting)
+                buffer_pixels[x, y, 2] = int(ceiling_array[tex_x, tex_y, 2] * final_lighting)
 
 
 @numba.njit(fastmath=True)
@@ -280,9 +264,6 @@ def render_walls_numba(
     num_rays: int,
     ray_width: float,
     bob_offset_y: float,
-    fog_base_distance: float,
-    fog_base_intensity: float,
-    side_darkening_alpha: int,
     enable_flashlight: bool,
     flashlight_radius: float,
     flashlight_intensity: float,
@@ -313,9 +294,6 @@ def render_walls_numba(
         num_rays: Number of rays to cast
         ray_width: Width of each ray column in pixels
         bob_offset_y: View bobbing offset
-        fog_base_distance: Base fog distance
-        fog_base_intensity: Base fog intensity (0-1)
-        side_darkening_alpha: Alpha value for side darkening (0-255)
         enable_flashlight: Enable flashlight radial falloff
         flashlight_radius: Flashlight beam radius (0-1)
         flashlight_intensity: Flashlight edge darkening (0-1)
@@ -379,22 +357,16 @@ def render_walls_numba(
         # Calculate lighting intensity
         lighting_multiplier = 1.0
         
-        # 1. Distance-based lighting (inverse square law or linear)
+        # Distance-based lighting (inverse square law or constant)
         if enable_inverse_square:
             # Inverse square law: intensity = power / (distance^2)
             distance_factor = light_intensity / (distance * distance + 0.1)
             distance_factor = max(ambient_light, min(1.0, distance_factor))
         else:
-            # Original linear fog
-            fog_intensity = min(1.0, distance / fog_base_distance)
-            distance_factor = 1.0 - (fog_intensity * fog_base_intensity)
+            # No distance falloff
+            distance_factor = 1.0
         
         lighting_multiplier *= distance_factor
-        
-        # 2. Side darkening (horizontal vs vertical walls)
-        if side == 1:
-            side_alpha = side_darkening_alpha / 255.0
-            lighting_multiplier *= (1.0 - side_alpha)
         
         x_start = int(ray_index * ray_width)
         x_end = int((ray_index + 1) * ray_width)

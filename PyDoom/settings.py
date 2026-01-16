@@ -88,16 +88,6 @@ class MinimapSettings:
 
 
 @dataclass(frozen=True)
-class FogSettings:
-    """Fog and lighting configuration."""
-    base_fog_distance: float = 1.0
-    base_fog_intensity: float = 1
-    floor_fog_intensity: float = 0
-    ceiling_fog_intensity: float = 0
-    side_darkening_alpha: int = 0
-
-
-@dataclass(frozen=True)
 class LightingSettings:
     """Advanced lighting configuration for horror atmosphere."""
     # Flashlight effect (radial falloff)
@@ -127,7 +117,6 @@ class GameSettings:
     assets: AssetSettings = AssetSettings()
     colors: ColorPalette = ColorPalette()
     minimap: MinimapSettings = MinimapSettings()
-    fog: FogSettings = FogSettings()
     lighting: LightingSettings = LightingSettings()
     
     show_fps: bool = True

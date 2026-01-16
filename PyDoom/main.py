@@ -10,6 +10,7 @@ from world.map import Map
 from world.player import Player
 from engine.assets import AssetManager
 from engine.raycaster import Raycaster
+from engine.audio import AudioManager
 
 
 class Game:
@@ -49,6 +50,9 @@ class Game:
             self.screen_height,
             self.asset_manager
         )
+        
+        self.audio_manager: AudioManager = AudioManager()
+        self.audio_manager.play_music()
         
         self.font: pygame.font.Font = pygame.font.Font(None, 36)
 
@@ -170,8 +174,12 @@ class Game:
             self.handle_player_input(dt)
             self.player.update_bobbing(dt)
             
+            self.audio_manager.update_footsteps(dt, self.player.is_moving, self.player.is_sprinting)
+            
             for monster in self.game_map.monsters:
                 monster.move_towards_player(self.player, dt)
+            
+            self.audio_manager.update_all_monster_sounds(self.game_map.monsters, self.player)
             
             self.game_map.update_sprite_data()
             

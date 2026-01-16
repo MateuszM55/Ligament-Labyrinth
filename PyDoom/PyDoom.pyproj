@@ -21,6 +21,7 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="engine\audio.py" />
     <Compile Include="main.py" />
     <Compile Include="settings.py" />
     <Compile Include="engine\assets.py" />

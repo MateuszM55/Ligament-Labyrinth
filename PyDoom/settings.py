@@ -114,6 +114,29 @@ class LightingSettings:
 
 
 @dataclass(frozen=True)
+class AudioSettings:
+    """Audio and sound configuration."""
+    sounds_directory: str = "sounds"
+    music_directory: str = "music"
+    
+    # Volume levels (0.0 to 1.0)
+    master_volume: float = 1.0
+    music_volume: float = 1
+    sfx_volume: float = 0.7
+    
+    # Footstep settings
+    footstep_interval: float = 0.4  # Time between footstep sounds in seconds (walking)
+    footstep_sprint_interval: float = 0.25  # Time between footstep sounds when sprinting
+    
+    # Monster sound settings
+    monster_sound_min_volume: float = 0.05  # Minimum volume for monster sounds
+    
+    # 3D Audio settings
+    max_audio_distance: float = 5.0  # Maximum distance for sound 
+    enable_3d_audio: bool = True  # Enable distance-based volume scaling
+
+
+@dataclass(frozen=True)
 class GameSettings:
     """Master settings container."""
     display: DisplaySettings = DisplaySettings()
@@ -125,6 +148,7 @@ class GameSettings:
     colors: ColorPalette = ColorPalette()
     minimap: MinimapSettings = MinimapSettings()
     lighting: LightingSettings = LightingSettings()
+    audio: AudioSettings = AudioSettings()
     
     show_fps: bool = True
 

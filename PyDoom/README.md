@@ -65,4 +65,18 @@ This project is for educational purposes.
 
 ## Credits
 
-Inspired by classic raycasting techniques and horror game design.
+Textures and audio assets sourced from free online resources:
+Monster Sprites:
+	Artist: BTL Games
+	Source: https://btl-games.itch.io/
+	License: CC0 1.0 Universal
+
+Textures:
+	Artist: Screaming Brain Studios
+	Source: https://screamingbrainstudios.itch.io/
+	License: CC0 1.0 Universal
+
+Music:
+	Composer: Trey Travis
+	Source: https://trey-travis.itch.io/
+	License: CC0 1.0 Universal

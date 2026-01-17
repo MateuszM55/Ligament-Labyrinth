@@ -8,6 +8,7 @@ from pygame.locals import *
 from settings import settings
 from world.map import Map
 from world.player import Player
+from world.entity_manager import EntityManager
 from engine.assets import AssetManager
 from engine.raycaster import Raycaster
 from engine.audio import AudioManager
@@ -41,7 +42,12 @@ class Game:
         pygame.event.set_grab(True)
         pygame.mouse.set_visible(False)
         
-        self.game_map: Map = Map.load_from_file(settings.map.default_map_file)
+        # Load the raw data
+        self.game_map, m_data, c_data = Map.load_from_file(settings.map.default_map_file)
+        
+        # Initialize the entity manager
+        self.entity_manager: EntityManager = EntityManager()
+        self.entity_manager.load_entities(m_data, c_data)
         
         start_x, start_y = self.game_map.player_start
         self.player: Player = Player(start_x, start_y, 0.0)
@@ -131,27 +137,30 @@ class Game:
             
             self.audio_manager.update_footsteps(dt, self.player.is_moving, self.player.is_sprinting)
             
-            self.game_map.update(dt, self.player)
+            self.entity_manager.update(dt, self.player)
             
-            self.audio_manager.update_all_monster_sounds(self.game_map.monsters, self.player)
+            self.audio_manager.update_all_monster_sounds(self.entity_manager.monsters, self.player)
             
-            collected = self.game_map.check_collectible_collisions(self.player)
+            collected = self.entity_manager.check_collections(self.player)
             if collected > 0:
                 self.collectibles_obtained += collected
                 
                 if self.collectibles_obtained >= settings.collectible.total_count:
                     self.all_collectibles_obtained = True
-                    for monster in self.game_map.monsters:
+                    for monster in self.entity_manager.monsters:
                         monster.speed_multiplier = settings.monster.speed_boost_multiplier
             
-            self.current_glitch_intensity = Raycaster.calculate_glitch_intensity(self.game_map, self.player)
+            self.current_glitch_intensity = Raycaster.calculate_glitch_intensity(self.entity_manager, self.player)
             
-            if self.game_map.check_monster_collisions(self.player):
+            if self.entity_manager.check_collisions(self.player):
                 self.running = False
             
     def render(self) -> None:
         """Render everything to the screen."""
         self.screen.fill(settings.colors.black)
+        
+        # Quick hack to keep Raycaster working without signature changes
+        self.game_map.sprite_data = self.entity_manager.sprite_data
         
         self.raycaster.render(self.screen, self.player, self.game_map, self.current_glitch_intensity)
         

@@ -23,6 +23,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="engine\audio.py" />
+    <Compile Include="LigamentLabyrinth\world\entity_manager.py" />
     <Compile Include="main.py" />
     <Compile Include="settings.py" />
     <Compile Include="engine\assets.py" />
@@ -38,6 +39,8 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="engine\" />
+    <Folder Include="LigamentLabyrinth\" />
+    <Folder Include="LigamentLabyrinth\world\" />
     <Folder Include="world\" />
   </ItemGroup>
   <ItemGroup>

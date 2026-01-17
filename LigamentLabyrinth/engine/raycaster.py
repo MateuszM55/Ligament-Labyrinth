@@ -8,11 +8,15 @@ from settings import settings
 from engine.assets import AssetManager
 from world.player import Player
 from world.map import Map
+from typing import TYPE_CHECKING
 from engine.numba_kernels import (
     render_floor_ceiling_numba, 
     render_walls_numba,
     process_sprites_numba
 )
+
+if TYPE_CHECKING:
+    from world.entity_manager import EntityManager
 
 
 class Raycaster:
@@ -168,11 +172,11 @@ class Raycaster:
         self.render_3d_view_numba(screen, player, game_map, glitch_intensity)
     
     @staticmethod
-    def calculate_glitch_intensity(game_map: Map, player: Player) -> float:
+    def calculate_glitch_intensity(entity_manager: 'EntityManager', player: Player) -> float:
         """Calculate dynamic glitch intensity based on closest monster distance.
         
         Args:
-            game_map: Game map containing monsters
+            entity_manager: EntityManager containing monsters
             player: Player object
             
         Returns:
@@ -183,7 +187,7 @@ class Raycaster:
         if not settings.render.glitch_enable_monster_proximity:
             return base_intensity
         
-        closest_distance = game_map.get_closest_monster_distance(player)
+        closest_distance = entity_manager.get_closest_monster_distance(player)
         
         if closest_distance == float('inf'):
             return base_intensity

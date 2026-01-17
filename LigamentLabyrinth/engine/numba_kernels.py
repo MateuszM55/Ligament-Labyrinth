@@ -6,7 +6,22 @@ import numba
 from numba import types
 import math
 
+# -----------------------------------------------------------------------------
+# What is Raycasting?
+# Imagine you are standing in a room with your eyes closed. To figure out the shape
+# of the room, you send out laser pointers (rays) in a fan shape in front of you.
+# When a laser hits a wall, you measure the distance.
+# 
+# 1. Short distance = Wall is close = Draw a tall wall strip.
+# 2. Long distance = Wall is far = Draw a short wall strip.
+# 
+# This file handles the heavy math to do this thousands of times per second.
+# -----------------------------------------------------------------------------
 
+
+
+# We use @numba.njit to compile this Python code into C-speed machine code.
+# Without this, the game would run at 1 frame per second.
 @numba.njit(
     types.Tuple((types.float64, types.int64, types.float64, types.float64, types.int64))(
         types.float64, types.float64, types.float64,
@@ -24,85 +39,96 @@ def cast_ray_numba(
     map_height: int,
     max_depth: float
 ) -> tuple:
-    """Cast a single ray using DDA algorithm (Numba JIT optimized).
-    
-    Args:
-        player_x: Player X position
-        player_y: Player Y position
-        angle_rad: Ray angle in radians
-        map_grid: 2D NumPy array of map tiles
-        map_width: Width of the map
-        map_height: Height of the map
-        max_depth: Maximum ray distance
-        
-    Returns:
-        Tuple of (distance, side, ray_dx, ray_dy, hit_value)
-        - distance: Distance to wall
-        - side: 0 for vertical wall, 1 for horizontal wall
-        - ray_dx: Ray direction X component
-        - ray_dy: Ray direction Y component
-        - hit_value: Tile value that was hit
     """
+    Casts a SINGLE ray from the player to find the nearest wall.
+    
+    It uses an algorithm called DDA (Digital Differential Analysis).
+    Instead of checking every 0.1 steps (which is slow), DDA checks 
+    intersection points on the grid lines. It jumps from grid line to grid line.
+    """
+    
+    # 1. Calculate Ray Direction
+    # We turn the angle (radians) into X and Y vector components.
     ray_dx = math.cos(angle_rad)
     ray_dy = math.sin(angle_rad)
     
+    # Current position on the map
     x = player_x
     y = player_y
     
+    # Which grid square are we in? (e.g., Row 5, Column 3)
     map_x = int(x)
     map_y = int(y)
     
+    # 2. Calculate Delta Distances
+    # "If I move 1 unit along the ray, how many X units or Y units did I cross?"
+    # This helps us scale the steps to hit the next grid line perfectly.
     if ray_dx != 0:
         delta_dist_x = abs(1.0 / ray_dx)
     else:
-        delta_dist_x = 1e30
+        delta_dist_x = 1e30 # Avoid division by zero (infinity)
         
     if ray_dy != 0:
         delta_dist_y = abs(1.0 / ray_dy)
     else:
         delta_dist_y = 1e30
-    
+
+    # 3. Calculate Step and Initial Side Distances
+    # We need to decide if we are stepping Left (-1) or Right (+1), Up or Down.
     if ray_dx < 0:
         step_x = -1
+        # Distance to the first grid line to our left
         side_dist_x = (x - map_x) * delta_dist_x
     else:
         step_x = 1
+        # Distance to the first grid line to our right
         side_dist_x = (map_x + 1.0 - x) * delta_dist_x
         
     if ray_dy < 0:
         step_y = -1
+        # Distance to the first grid line above us
         side_dist_y = (y - map_y) * delta_dist_y
     else:
         step_y = 1
+        # Distance to the first grid line below us
         side_dist_y = (map_y + 1.0 - y) * delta_dist_y
     
+    # 
+
+    # 4. Perform DDA (The Search Loop)
     hit = False
     hit_val = 0
-    side = 0
-    max_iterations = 50
+    side = 0 # 0 = hit a vertical wall, 1 = hit a horizontal wall (used for shading)
+    max_iterations = 50 # Safety limit: don't look further than 50 blocks
     iterations = 0
     
     while not hit and iterations < max_iterations:
+        # Jump to whichever grid line is closer (X or Y)
         if side_dist_x < side_dist_y:
             side_dist_x += delta_dist_x
             map_x += step_x
-            side = 0
+            side = 0 # We moved horizontally, so we hit a vertical line
         else:
             side_dist_y += delta_dist_y
             map_y += step_y
-            side = 1
+            side = 1 # We moved vertically, so we hit a horizontal line
         
         iterations += 1
         
+        # Check if ray went out of bounds (outside the map)
         if map_x < 0 or map_x >= map_width or map_y < 0 or map_y >= map_height:
             hit = True
-            hit_val = 1
+            hit_val = 1 # Treat out-of-bounds as a solid wall
         else:
+            # Check the map grid: Is there a wall here?
             tile = map_grid[map_y, map_x]
             if tile > 0:
                 hit = True
                 hit_val = tile
     
+    # 5. Calculate Final Distance
+    # This math corrects the "Fish-eye" effect. We want the perpendicular distance
+    # to the camera plane, not the Euclidean distance to the player point.
     if side == 0:
         if ray_dx != 0:
             distance = (map_x - x + (1 - step_x) / 2) / ray_dx
@@ -116,6 +142,7 @@ def cast_ray_numba(
     
     distance = abs(distance)
     
+    # Cap the distance to avoid rendering errors at infinite depth
     if distance > max_depth or distance < 0:
         distance = max_depth
         
@@ -151,7 +178,7 @@ def cast_ray_numba(
         types.float64              # glitch_intensity
     ),
     fastmath=True,
-    parallel=True,
+    parallel=True, # Uses multiple CPU cores
     cache=True
 )
 def render_floor_ceiling_numba(
@@ -181,40 +208,27 @@ def render_floor_ceiling_numba(
     vignette_radius: float,
     glitch_intensity: float
 ) -> None:
-    """Render floor and ceiling with Numba optimization and advanced lighting.
-    
-    Args:
-        buffer_pixels: Output pixel buffer (floor_width x floor_height x 3)
-        floor_arrays: All floor textures (num_textures x tex_width x tex_height x 3)
-        ceiling_arrays: All ceiling textures (num_textures x tex_width x tex_height x 3)
-        floor_grid: Floor texture ID map (map_height x map_width)
-        ceiling_grid: Ceiling texture ID map (map_height x map_width)
-        map_width: Width of the map
-        map_height: Height of the map
-        floor_width: Width of the render buffer
-        floor_height: Height of the render buffer
-        floor_scale: Downscaling factor for floor rendering
-        screen_width: Actual screen width
-        screen_height: Actual screen height
-        player_x: Player X position
-        player_y: Player Y position
-        player_rotation_rad: Player rotation in radians
-        fov_rad: Field of view in radians
-        bob_offset_y: View bobbing offset
-        wall_height_factor: Multiplier for wall height calculation
-        enable_inverse_square: Use inverse square law for distance
-        light_intensity: Base light power for inverse square
-        ambient_light: Minimum light level (0-1)
-        enable_vignette: Enable screen edge vignette
-        vignette_intensity: Vignette darkness (0-1)
-        vignette_radius: Vignette start radius (0-1)
-        glitch_intensity: LSD Glitch effect intensity (0=off, higher=more intense)
     """
+    Renders the floor and ceiling.
+    
+    This is trickier than walls. We iterate over every horizontal ROW of the screen.
+    For a specific row on screen, the distance to the floor in the 3D world is constant.
+    
+    Concept:
+    Screen Top ----------------- (Ceiling, infinite distance)
+                 ...
+    Horizon    ----------------- (Horizon line, infinite distance)
+                 ...
+    Screen Bot ----------------- (Floor at your feet, distance 0)
+    """
+    
+    # 1. Setup Frustum (The "Camera Triangle")
     half_fov_rad = fov_rad / 2.0
     tan_half_fov = math.tan(half_fov_rad)
     aspect_ratio = screen_width / screen_height
     screen_half = screen_height / 2.0 + bob_offset_y
     
+    # Get texture dimensions so we know how to map pixels
     num_floor_textures = floor_arrays.shape[0]
     num_ceiling_textures = ceiling_arrays.shape[0]
     floor_tex_width = floor_arrays.shape[1]
@@ -222,133 +236,135 @@ def render_floor_ceiling_numba(
     ceiling_tex_width = ceiling_arrays.shape[1]
     ceiling_tex_height = ceiling_arrays.shape[2]
     
-    # Precompute texture mask for bitwise AND (assumes power-of-2 textures)
+    # Bitwise mask is a fast way to wrap textures (e.g. coord 65 becomes 1 in a 64-size texture)
     floor_tex_mask = floor_tex_width - 1
     ceiling_tex_mask = ceiling_tex_width - 1
     
+    # Pre-calculate player direction vectors
     player_cos = math.cos(player_rotation_rad)
     player_sin = math.sin(player_rotation_rad)
     
+    # Calculate the left and right edges of the camera plane
     plane_x = -player_sin * tan_half_fov * aspect_ratio
     plane_y = player_cos * tan_half_fov * aspect_ratio
     
+    # Camera height (Z)
     pos_z = 0.5 * screen_height * wall_height_factor
     epsilon = 1.0
     
-    # Precompute vignette constants (outside loops for performance)
+    # Constants for the "Vignette" (dark corners effect)
     vignette_radius_squared = vignette_radius * vignette_radius
-    vignette_denominator = 1.414 - vignette_radius + 0.001  # Constant for falloff calculation
+    vignette_denominator = 1.414 - vignette_radius + 0.001
     
-    # Parallelize the outer loop across CPU cores
+    # 2. Iterate over Rows (Parallelized for speed)
+    # y represents the vertical coordinate on the screen
     for y in numba.prange(floor_height):
         screen_y = y * floor_scale
+        
+        # p is the position relative to the center of the screen (horizon)
         p = screen_y - screen_half
         
+        # Avoid division by zero at the exact horizon line
         if abs(p) < epsilon:
             p = epsilon if p >= 0 else -epsilon
         
-        # Calculate row properties ONCE per row (not per pixel)
-        # This reduces ~920,000 divisions to ~720 for a 1280x720 screen
+        # MAGIC MATH: Calculate how far away this screen row is in the 3D world.
+        # Pixels closer to the center of the screen are far away (high row_distance).
+        # Pixels at the bottom of the screen are close (low row_distance).
         row_distance = pos_z / abs(p)
         
-        # Distance-based lighting is also constant per row
+        # Calculate lighting factor for this whole row based on distance
         if enable_inverse_square:
             distance_factor = light_intensity / (row_distance * row_distance + 0.1)
             distance_factor = max(ambient_light, min(1.0, distance_factor))
         else:
             distance_factor = 1.0
         
+        # 3. Iterate over Columns (pixels in the row)
         for x in range(floor_width):
             screen_x = x * floor_scale
             
+            # Map screen X (-1 to 1) to world coordinates
             screen_x_norm = (2.0 * x / floor_width) - 1.0
             ray_dir_x = player_cos + plane_x * screen_x_norm
             ray_dir_y = player_sin + plane_y * screen_x_norm
             
+            # This is the exact spot on the floor map this pixel represents
             world_x = player_x + ray_dir_x * row_distance
             world_y = player_y + ray_dir_y * row_distance
             
-            # Calculate vignette effect (optimized with squared distance)
+            # --- VIGNETTE & GLITCH EFFECTS ---
             vignette_multiplier = 1.0
             if enable_vignette:
+                # Calculate distance from center of screen for darkness
                 x_norm = (screen_x - screen_width / 2.0) / (screen_width / 2.0)
                 y_norm = (screen_y - screen_height / 2.0) / (screen_height / 2.0)
-                # Use squared distance for comparison to avoid sqrt
                 screen_dist_squared = x_norm * x_norm + y_norm * y_norm
                 
-                # Only compute sqrt if we're in the vignette region
                 if screen_dist_squared > vignette_radius_squared:
                     screen_dist = math.sqrt(screen_dist_squared)
                     vignette_falloff = (screen_dist - vignette_radius) / vignette_denominator
                     vignette_falloff = min(1.0, vignette_falloff)
                     vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
             
-            # Combine lighting effects with glitch (branchless)
-            # "Corrupted Flashlight" effect: Light itself fuels the glitch
-            # The brighter the light, the more intense the negative overflow
             base_lighting = distance_factor * vignette_multiplier
+            
+            # The "Glitch" makes colors weird by multiplying them negatively
             corruption_multiplier = 1.0 - glitch_intensity
             final_lighting = base_lighting * corruption_multiplier
-            # When glitch_intensity == 0, this behaves normally (corruption_multiplier = 1.0)
-            # When glitch_intensity > 0, lighting gets darker enabling color wrapping effects
             
-            # Get map tile coordinates
+            # --- TEXTURE MAPPING ---
             map_x = int(world_x)
             map_y = int(world_y)
             
-            # Clamp to map bounds
-            if map_x < 0:
-                map_x = 0
-            if map_x >= map_width:
-                map_x = map_width - 1
-            if map_y < 0:
-                map_y = 0
-            if map_y >= map_height:
-                map_y = map_height - 1
+            # Clamp to map boundaries so we don't crash reading outside the array
+            if map_x < 0: map_x = 0
+            if map_x >= map_width: map_x = map_width - 1
+            if map_y < 0: map_y = 0
+            if map_y >= map_height: map_y = map_height - 1
             
+            # Decide if we are drawing Floor (bottom half) or Ceiling (top half)
             if p > epsilon:
-                # Floor rendering
+                # --- FLOOR ---
                 floor_tex_id = floor_grid[map_y, map_x]
-                if floor_tex_id >= num_floor_textures:
-                    floor_tex_id = 0
+                if floor_tex_id >= num_floor_textures: floor_tex_id = 0
                 
-                # Use bitwise AND for texture wrapping (faster than modulo)
+                # Get the pixel from the texture image
                 tex_x = int(world_x * floor_tex_width) & floor_tex_mask
                 tex_y = int(world_y * floor_tex_height) & floor_tex_mask
                 
-                # Apply lighting with potential wrapping for glitch effect (branchless)
-                # Always use modulo wrapping - when glitch_intensity is 0, values stay in valid range naturally
+                # Apply color and lighting
+                # The % 256 is vital for the glitch effect to "wrap around" colors
                 r = int(floor_arrays[floor_tex_id, tex_x, tex_y, 0] * final_lighting) % 256
                 g = int(floor_arrays[floor_tex_id, tex_x, tex_y, 1] * final_lighting) % 256
                 b = int(floor_arrays[floor_tex_id, tex_x, tex_y, 2] * final_lighting) % 256
-                # Handle negative values (wrap from 255)
+                
+                # Fix negative numbers if glitch caused them
                 r = (r + 256) % 256
                 g = (g + 256) % 256
                 b = (b + 256) % 256
+                
                 buffer_pixels[x, y, 0] = r
                 buffer_pixels[x, y, 1] = g
                 buffer_pixels[x, y, 2] = b
             
-            
             elif p < -epsilon:
-                # Ceiling rendering
+                # --- CEILING ---
+                # (Logic is identical to floor, just using ceiling arrays)
                 ceiling_tex_id = ceiling_grid[map_y, map_x]
-                if ceiling_tex_id >= num_ceiling_textures:
-                    ceiling_tex_id = 0
+                if ceiling_tex_id >= num_ceiling_textures: ceiling_tex_id = 0
                 
-                # Use bitwise AND for texture wrapping (faster than modulo)
                 tex_x = int(world_x * ceiling_tex_width) & ceiling_tex_mask
                 tex_y = int(world_y * ceiling_tex_height) & ceiling_tex_mask
                 
-                # Apply lighting with potential wrapping for glitch effect (branchless)
-                # Always use modulo wrapping - when glitch_intensity is 0, values stay in valid range naturally
                 r = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 0] * final_lighting) % 256
                 g = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 1] * final_lighting) % 256
                 b = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 2] * final_lighting) % 256
-                # Handle negative values (wrap from 255)
+                
                 r = (r + 256) % 256
                 g = (g + 256) % 256
                 b = (b + 256) % 256
+                
                 buffer_pixels[x, y, 0] = r
                 buffer_pixels[x, y, 1] = g
                 buffer_pixels[x, y, 2] = b
@@ -413,35 +429,18 @@ def render_walls_numba(
     glitch_intensity: float,
     depth_buffer: np.ndarray
 ) -> None:
-    """Render walls using Numba optimization with advanced horror lighting.
-    
-    Args:
-        screen_pixels: Output pixel buffer (screen_width x screen_height x 3)
-        texture_arrays: All wall textures (max_textures x tex_width x tex_height x 3)
-        texture_map: Map from hit_value to texture index (max_tile_types,)
-        player_x: Player X position
-        player_y: Player Y position
-        player_rotation_deg: Player rotation in degrees
-        map_grid: 2D NumPy array of map tiles
-        map_width: Width of the map
-        map_height: Height of the map
-        screen_width: Screen width in pixels
-        screen_height: Screen height in pixels
-        fov: Field of view in degrees
-        max_depth: Maximum ray distance
-        num_rays: Number of rays to cast
-        ray_width: Width of each ray column in pixels
-        bob_offset_y: View bobbing offset
-        wall_height_factor: Multiplier for wall height calculation
-        enable_inverse_square: Use inverse square law for distance
-        light_intensity: Base light power for inverse square
-        ambient_light: Minimum light level (0-1)
-        enable_vignette: Enable screen edge vignette
-        vignette_intensity: Vignette darkness (0-1)
-        vignette_radius: Vignette start radius (0-1)
-        glitch_intensity: LSD Glitch effect intensity (0=off, higher=more intense)
-        depth_buffer: Pre-allocated depth buffer (screen_width,) to fill with distances
     """
+    Renders the vertical wall strips.
+    
+    This is the core of the 3D effect. We sweep across the screen from left to right.
+    For every vertical column of pixels:
+    1. Cast a ray at that angle.
+    2. See how far away the wall is.
+    3. Draw a vertical line of pixels.
+       - Close wall = Long line (looks big).
+       - Far wall = Short line (looks small).
+    """
+    
     half_fov_rad = math.radians(fov / 2.0)
     tan_half_fov = math.tan(half_fov_rad)
     aspect_ratio = screen_width / screen_height
@@ -449,48 +448,66 @@ def render_walls_numba(
     
     tex_width = texture_arrays.shape[1]
     tex_height = texture_arrays.shape[2]
-    
-    # Precompute texture mask for bitwise AND (assumes power-of-2 textures)
     tex_mask = tex_width - 1
     
-    # Precompute vignette constants (outside loops for performance)
+    # Precompute vignette constants
     vignette_radius_squared = vignette_radius * vignette_radius
-    vignette_denominator = 1.414 - vignette_radius + 0.001  # Constant for falloff calculation
+    vignette_denominator = 1.414 - vignette_radius + 0.001 
     
-    # Reset depth buffer for this frame (avoids reallocation)
+    # Clear the depth buffer (reset distance to infinity for new frame)
+    # The depth buffer remembers how far away the wall is at every pixel column.
+    # We need this later so sprites don't draw ON TOP of walls they should be behind.
     depth_buffer[:] = max_depth
     
-    # Parallelize ray casting across CPU cores
+    # 
+
+    # LOOP: Process every vertical strip (ray) of the screen
     for ray_index in numba.prange(num_rays):
+        
+        # 1. Calculate the Ray Angle
+        # Map ray_index (0 to screen_width) to -1 to 1
         screen_x = (2.0 * ray_index) / num_rays - 1.0
+        
+        # Calculate angle offset from the player's center view
         angle_offset_rad = math.atan(screen_x * tan_half_fov * aspect_ratio)
         angle_offset_deg = math.degrees(angle_offset_rad)
         
         ray_angle_deg = player_rotation_deg + angle_offset_deg
         ray_angle_rad = math.radians(ray_angle_deg)
         
+        # 2. Cast the Ray (Find the wall)
         distance, side, ray_dx, ray_dy, hit_val = cast_ray_numba(
             player_x, player_y, ray_angle_rad,
             map_grid, map_width, map_height, max_depth
         )
         
+        # 3. Fix Fish-Eye Effect
+        # If we use raw distance, straight walls look curved. We must multiply
+        # by cos(angle_offset) to flatten the view.
         raw_distance = distance
         distance *= math.cos(angle_offset_rad)
         
-        if distance < 0.01:
-            distance = 0.01
+        if distance < 0.01: distance = 0.01 # Prevent divide by zero
         
+        # 4. Calculate Wall Dimensions
+        # Height is inversely proportional to distance (1/distance)
         wall_height = int((screen_height * wall_height_factor) / distance)
+        
+        # Find where the wall starts on screen (centered vertically)
         wall_top = int(screen_half - (wall_height / 2.0))
         
+        # 5. Calculate Texture X Coordinate
+        # We need to know exactly WHERE on the wall block we hit (0.0 to 1.0)
+        # to know which column of the texture image to draw.
         if side == 0:
             wall_x = player_y + raw_distance * ray_dy
         else:
             wall_x = player_x + raw_distance * ray_dx
         
-        wall_x -= math.floor(wall_x)
+        wall_x -= math.floor(wall_x) # Keep only the decimal part
         tex_x = int(wall_x * tex_width)
         
+        # Flip texture if hitting the "back" side of a block so it doesn't look mirrored
         if side == 0 and ray_dx > 0:
             tex_x = tex_width - tex_x - 1
         if side == 1 and ray_dy < 0:
@@ -498,77 +515,74 @@ def render_walls_numba(
         
         tex_x = max(0, min(tex_x, tex_width - 1))
         
+        # Look up which texture image to use
         texture_idx = 0
         if hit_val < len(texture_map):
             texture_idx = int(texture_map[hit_val])
         
-        # Calculate lighting intensity
+        # 6. Lighting Calculation
         lighting_multiplier = 1.0
-        
-        # Distance-based lighting (inverse square law or constant)
         if enable_inverse_square:
-            # Inverse square law: intensity = power / (distance^2)
             distance_factor = light_intensity / (distance * distance + 0.1)
             distance_factor = max(ambient_light, min(1.0, distance_factor))
         else:
-            # No distance falloff
             distance_factor = 1.0
         
         lighting_multiplier *= distance_factor
         
+        # Determine which screen columns this ray covers (usually just 1, unless low res)
         x_start = int(ray_index * ray_width)
         x_end = int((ray_index + 1) * ray_width)
         x_end = min(x_end, screen_width)
         
-        
-        
+        # 7. Draw the Wall Strip
         if wall_height > 0 and wall_height < 8000:
             for screen_x_pos in range(x_start, x_end):
-                # Store distance in depth buffer for occlusion testing
+                
+                # Write to Depth Buffer (Vital for Sprites later!)
                 depth_buffer[screen_x_pos] = distance
                 
-                # Calculate vignette effect (per-pixel screen position)
+                # Iterate down the vertical line
                 for screen_y_pos in range(max(0, wall_top), min(screen_height, wall_top + wall_height)):
+                    
+                    # --- Vignette Calculation ---
                     vignette_multiplier = 1.0
                     if enable_vignette:
                         x_norm = (screen_x_pos - screen_width / 2.0) / (screen_width / 2.0)
                         y_norm = (screen_y_pos - screen_height / 2.0) / (screen_height / 2.0)
-                        # Use squared distance for comparison to avoid sqrt
                         screen_dist_squared = x_norm * x_norm + y_norm * y_norm
                         
-                        # Only compute sqrt if we're in the vignette region
                         if screen_dist_squared > vignette_radius_squared:
                             screen_dist = math.sqrt(screen_dist_squared)
                             vignette_falloff = (screen_dist - vignette_radius) / vignette_denominator
                             vignette_falloff = min(1.0, vignette_falloff)
                             vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
                     
-                    # Combine all lighting effects with glitch (branchless)
-                    # "Corrupted Flashlight" effect: Light itself fuels the glitch
-                    # The brighter the light, the more intense the negative overflow
+                    # Combine Lighting + Glitch
                     base_lighting = lighting_multiplier * vignette_multiplier
                     corruption_multiplier = 1.0 - glitch_intensity
                     final_lighting = base_lighting * corruption_multiplier
-                    # When glitch_intensity == 0, this behaves normally (corruption_multiplier = 1.0)
-                    # When glitch_intensity > 0, lighting gets darker enabling color wrapping effects
                     
+                    # --- Texture Sampling ---
+                    # Map screen Y to Texture Y
                     y_ratio = (screen_y_pos - wall_top) / wall_height
                     tex_y = int(y_ratio * tex_height)
                     tex_y = max(0, min(tex_y, tex_height - 1))
                     
+                    # Get RGB colors
                     r = texture_arrays[texture_idx, tex_x, tex_y, 0]
                     g = texture_arrays[texture_idx, tex_x, tex_y, 1]
                     b = texture_arrays[texture_idx, tex_x, tex_y, 2]
                     
-                    # Apply lighting with potential wrapping for glitch effect (branchless)
-                    # Always use modulo wrapping - when glitch_intensity is 0, values stay in valid range naturally
+                    # Apply final lighting and write to screen buffer
                     r_lit = int(r * final_lighting) % 256
                     g_lit = int(g * final_lighting) % 256
                     b_lit = int(b * final_lighting) % 256
-                    # Handle negative values (wrap from 255)
+                    
                     r_lit = (r_lit + 256) % 256
                     g_lit = (g_lit + 256) % 256
                     b_lit = (b_lit + 256) % 256
+                    
                     screen_pixels[screen_x_pos, screen_y_pos, 0] = r_lit
                     screen_pixels[screen_x_pos, screen_y_pos, 1] = g_lit
                     screen_pixels[screen_x_pos, screen_y_pos, 2] = b_lit
@@ -590,7 +604,7 @@ def render_walls_numba(
         types.float64,             # light_intensity
         types.float64,             # ambient_light
         types.float32[:],          # depth_buffer
-        types.UniTuple(types.int64, 3)  # collectible_texture_ids (tuple of 3 ints)
+        types.UniTuple(types.int64, 3)  # collectible_texture_ids
     ),
     fastmath=True,
     cache=True
@@ -612,33 +626,21 @@ def process_sprites_numba(
     depth_buffer: np.ndarray,
     collectible_texture_ids: tuple
 ) -> np.ndarray:
-    """Process sprite rendering with Numba optimization and depth buffer occlusion for collectibles only.
-    
-    Args:
-        sprite_data: Array of shape (N, 3) with [x, y, texture_id] for each sprite
-        player_x: Player X position
-        player_y: Player Y position
-        player_rotation_deg: Player rotation in degrees
-        fov: Field of view in degrees
-        screen_width: Screen width in pixels
-        screen_height: Screen height in pixels
-        max_depth: Maximum render distance
-        wall_height_factor: Multiplier for sprite height calculation
-        bob_offset_y: View bobbing offset
-        enable_inverse_square: Use inverse square law for lighting
-        light_intensity: Base light power
-        ambient_light: Minimum light level (0-1)
-        depth_buffer: Array of shape (screen_width,) with wall distances for occlusion
-        collectible_texture_ids: Tuple of texture IDs that should be occluded by walls
-        
-    Returns:
-        Array of shape (M, 6) with [screen_x, sprite_height, sprite_width, distance, texture_id, light_factor]
-        sorted by distance (farthest first), where M <= N (after culling)
     """
+    Calculates where to draw 2D sprites (items, monsters) on the screen.
+    
+    This technique is called 'Billboarding'. The sprite is a 2D flat image,
+    but we calculate its size and position so it *looks* like it's standing
+    in the 3D world.
+    
+    
+    """
+    
     num_sprites = sprite_data.shape[0]
     if num_sprites == 0:
         return np.empty((0, 6), dtype=np.float32)
     
+    # Pre-calc trig
     player_rad = math.radians(player_rotation_deg)
     player_cos = math.cos(player_rad)
     player_sin = math.sin(player_rad)
@@ -647,8 +649,8 @@ def process_sprites_numba(
     tan_half_fov = math.tan(half_fov)
     aspect_ratio = screen_width / screen_height
     
-    # Pre-allocate array with maximum possible size (num_sprites x 6 properties)
-    # This avoids Python list append overhead which destroys Numba performance
+    # We create a temporary array to hold valid sprites.
+    # We cannot use Python lists because Numba doesn't support them efficiently.
     visible_sprites_array = np.empty((num_sprites, 6), dtype=np.float32)
     count = 0
     
@@ -657,6 +659,7 @@ def process_sprites_numba(
         sprite_y_world = sprite_data[i, 1]
         texture_id = sprite_data[i, 2]
         
+        # 1. Translate sprite position relative to player
         dx = sprite_x_world - player_x
         dy = sprite_y_world - player_y
         
@@ -665,53 +668,63 @@ def process_sprites_numba(
         if distance < 0.1 or distance > max_depth:
             continue
         
+        # 2. Transform Sprite to "Camera Space" (Matrix rotation)
+        # sprite_y here is essentially "depth" (distance in front of camera)
+        # sprite_x here is horizontal position relative to camera center
         sprite_y = dx * player_cos + dy * player_sin
         sprite_x = dy * player_cos - dx * player_sin
         
+        # If sprite is behind the player (negative depth), don't draw
         if sprite_y <= 0.1:
             continue
         
+        # 3. Project to Screen Space
+        # Calculate where on the 2D screen this 3D point lands
         projection_plane_x = (sprite_x / sprite_y) / (tan_half_fov * aspect_ratio)
         screen_x = (screen_width / 2.0) * (1.0 + projection_plane_x)
         
+        # Calculate scale (size) based on distance
         sprite_height = (screen_height / sprite_y) * wall_height_factor
         sprite_width = sprite_height
         
+        # Check if off-screen
         if screen_x + sprite_width / 2 < 0 or screen_x - sprite_width / 2 > screen_width:
             continue
         
-        # Check depth buffer for occlusion - ONLY for collectibles, not monsters
+        # 4. Occlusion Culling (Hiding behind walls)
+        # We compare the sprite's distance to the 'depth_buffer' we filled in render_walls.
         is_collectible = False
         for coll_tex_id in collectible_texture_ids:
             if texture_id == coll_tex_id:
                 is_collectible = True
                 break
         
+        # Logic: If the wall at this pixel is CLOSER than the sprite, 
+        # the sprite is hidden.
         if is_collectible:
-            # Check if collectible is behind walls
             sprite_left = int(max(0, screen_x - sprite_width / 2))
             sprite_right = int(min(screen_width - 1, screen_x + sprite_width / 2))
             
-            # Check if sprite is behind walls for most of its width
             occluded_count = 0
             checked_count = 0
             for check_x in range(sprite_left, sprite_right + 1):
                 if check_x >= 0 and check_x < screen_width:
                     checked_count += 1
-                    if depth_buffer[check_x] < sprite_y:  # sprite_y is the perpendicular distance
+                    # depth_buffer stores wall distance. sprite_y is sprite distance.
+                    if depth_buffer[check_x] < sprite_y: 
                         occluded_count += 1
             
-            # If more than 70% of sprite width is occluded, skip it
+            # If >70% of the sprite is hidden by a wall, don't draw it at all.
             if checked_count > 0 and occluded_count / checked_count > 0.7:
                 continue
         
+        # 5. Store valid sprite for rendering
         if sprite_height > 0 and sprite_height < 10000:
             light_factor = 1.0
             if enable_inverse_square:
                 light_factor = min(1.0, light_intensity / (distance * distance + 0.1))
                 light_factor = max(ambient_light, light_factor)
             
-            # Fill the pre-allocated array instead of appending to Python list
             visible_sprites_array[count, 0] = distance
             visible_sprites_array[count, 1] = screen_x
             visible_sprites_array[count, 2] = sprite_height
@@ -723,19 +736,23 @@ def process_sprites_numba(
     if count == 0:
         return np.empty((0, 6), dtype=np.float32)
     
-    # Slice array to only include valid sprites
+    # 6. Sort Sprites
+    # We must draw sprites from Farthest to Closest (Painter's Algorithm)
+    # so that close sprites overlap far ones correctly.
     visible_sprites_array = visible_sprites_array[:count]
     
+    # Sort by distance (column 0), descending order (-visible...)
     indices = np.argsort(-visible_sprites_array[:, 0])
     sorted_sprites = visible_sprites_array[indices]
     
+    # Repackage results for the main game loop
     result = np.empty((len(sorted_sprites), 6), dtype=np.float32)
     for i in range(len(sorted_sprites)):
-        result[i, 0] = sorted_sprites[i, 1]
-        result[i, 1] = sorted_sprites[i, 2]
-        result[i, 2] = sorted_sprites[i, 3]
-        result[i, 3] = sorted_sprites[i, 0]
-        result[i, 4] = sorted_sprites[i, 4]
-        result[i, 5] = sorted_sprites[i, 5]
+        result[i, 0] = sorted_sprites[i, 1] # Screen X
+        result[i, 1] = sorted_sprites[i, 2] # Height
+        result[i, 2] = sorted_sprites[i, 3] # Width
+        result[i, 3] = sorted_sprites[i, 0] # Distance
+        result[i, 4] = sorted_sprites[i, 4] # Texture ID
+        result[i, 5] = sorted_sprites[i, 5] # Light
     
     return result

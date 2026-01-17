@@ -47,6 +47,12 @@ class Raycaster:
         self.minimap_cache: pygame.Surface = None
         self.minimap_cache_valid: bool = False
         
+        # Cache darkened sprites to avoid recreating surfaces every frame
+        # Key: (texture_id, width, height, quantized_light_factor)
+        # Value: darkened pygame.Surface
+        self.darkened_sprite_cache: dict = {}
+        self.max_cache_size: int = 1000
+        
     def render_floor_ceiling_vectorized(
         self, 
         screen: pygame.Surface, 
@@ -196,12 +202,23 @@ class Raycaster:
                 continue
             
             if sprite_width > 0 and sprite_height > 0:
-                scaled_sprite = pygame.transform.scale(sprite_texture, (sprite_width, sprite_height))
+                # Quantize light factor to reduce cache size (steps of 0.05)
+                quantized_light = round(light_factor * 20) / 20
+                cache_key = (texture_id, sprite_width, sprite_height, quantized_light)
                 
-                if light_factor < 1.0:
-                    dark_surface = pygame.Surface(scaled_sprite.get_size(), pygame.SRCALPHA)
-                    dark_surface.fill((0, 0, 0, int(255 * (1.0 - light_factor))))
-                    scaled_sprite.blit(dark_surface, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+                if cache_key in self.darkened_sprite_cache:
+                    scaled_sprite = self.darkened_sprite_cache[cache_key]
+                else:
+                    scaled_sprite = pygame.transform.scale(sprite_texture, (sprite_width, sprite_height))
+                    
+                    if quantized_light < 1.0:
+                        dark_surface = pygame.Surface(scaled_sprite.get_size(), pygame.SRCALPHA)
+                        dark_surface.fill((0, 0, 0, int(255 * (1.0 - quantized_light))))
+                        scaled_sprite.blit(dark_surface, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+                    
+                    # Add to cache if within size limit
+                    if len(self.darkened_sprite_cache) < self.max_cache_size:
+                        self.darkened_sprite_cache[cache_key] = scaled_sprite
                 
                 screen.blit(scaled_sprite, (draw_start_x, draw_start_y))
 

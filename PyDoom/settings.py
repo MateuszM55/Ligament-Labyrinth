@@ -22,7 +22,7 @@ class RenderSettings:
     floor_ceiling_ray_resolution_divisor: int = 1
     wall_height_factor: float = 1.0
     sprite_scale: float = 1.0
-    glitch_intensity: float = 0.0  # LSD Glitch effect intensity (0=off, higher values=more intense color banding)
+    glitch_intensity: float = 0.0  # LSD Glitch effect intensity (0=off, higher values=more intense)
     
     # Monster proximity glitch effect settings
     glitch_enable_monster_proximity: bool = True  # Enable dynamic glitch based on monster distance
@@ -71,7 +71,7 @@ class MapSettings:
 class AssetSettings:
     """Asset loading configuration."""
     texture_directory: str = "textures"
-    texture_size: int = 128
+    texture_size: int = 512
     
     default_texture_colors: dict = None
     

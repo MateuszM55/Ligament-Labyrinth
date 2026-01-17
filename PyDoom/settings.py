@@ -1,4 +1,4 @@
-"""Configuration and constants for PyDoom raycasting engine."""
+"""Configuration and constants for Ligament Labyrinth raycasting engine."""
 
 from dataclasses import dataclass
 from typing import Tuple
@@ -10,7 +10,7 @@ class DisplaySettings:
     width: int = 1280
     height: int = 720
     fps: int = 144
-    title: str = "PyDoom"
+    title: str = "Ligament Labyrinth"
 
 
 @dataclass(frozen=True)

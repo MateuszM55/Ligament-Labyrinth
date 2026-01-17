@@ -1,1 +1,1 @@
-"""Engine package for PyDoom raycasting."""
+"""Engine package for Ligament Labyrinth raycasting."""

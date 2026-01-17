@@ -1,1 +1,1 @@
-"""World package for PyDoom game entities."""
+"""World package for Ligament Labyrinth game entities."""

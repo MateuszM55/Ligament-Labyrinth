@@ -116,14 +116,14 @@ class AssetManager:
         # ID 0 uses the primary palette defined in settings
         if 0 not in self.floor_textures:
             surf = self._generate_checkerboard_texture(
-                texture_size, colors.floor_primary, colors.floor_secondary
+                texture_size, colors.floor_fallback_primary, colors.floor_fallback_secondary
             )
             self.floor_textures[0] = pygame.surfarray.array3d(surf)
             print("Generated fallback floor (ID 0)")
         
         if 0 not in self.ceiling_textures:
             surf = self._generate_checkerboard_texture(
-                texture_size, colors.ceiling_primary, colors.ceiling_secondary
+                texture_size, colors.ceiling_fallback_primary, colors.ceiling_fallback_secondary
             )
             self.ceiling_textures[0] = pygame.surfarray.array3d(surf)
             print("Generated fallback ceiling (ID 0)")

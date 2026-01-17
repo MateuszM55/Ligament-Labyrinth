@@ -15,10 +15,10 @@ class ColorPalette:
     wall_red:  Tuple[Tuple[int, int, int], Tuple[int, int, int]] = ((150, 100, 100), (100, 50, 50))
     wall_green: Tuple[Tuple[int, int, int], Tuple[int, int, int]] = ((100, 150, 100), (50, 100, 50))
     
-    floor_primary: Tuple[int, int, int] = (80, 80, 80)
-    floor_secondary: Tuple[int, int, int] = (60, 60, 60)
-    ceiling_primary: Tuple[int, int, int] = (40, 40, 60)
-    ceiling_secondary: Tuple[int, int, int] = (30, 30, 50)
+    floor_fallback_primary: Tuple[int, int, int] = (80, 80, 80)
+    floor_fallback_secondary: Tuple[int, int, int] = (60, 60, 60)
+    ceiling_fallback_primary: Tuple[int, int, int] = (40, 40, 60)
+    ceiling_fallback_secondary: Tuple[int, int, int] = (30, 30, 50)
     
     minimap_background: Tuple[int, int, int] = (0, 0, 0)
     minimap_wall_default: Tuple[int, int, int] = (100, 100, 100)

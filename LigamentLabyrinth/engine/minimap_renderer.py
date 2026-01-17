@@ -33,11 +33,10 @@ class MinimapRenderer:
                         tile_x = x * minimap_scale
                         tile_y = y * minimap_scale
 
-                        color = settings.colors.minimap_wall_default
-                        if tile == 2:
-                            color = settings.colors.minimap_wall_type2
-                        if tile == 3:
-                            color = settings.colors.minimap_wall_type3
+                        # Look up wall color by tile id from settings; fall back to default
+                        color = settings.colors.minimap_wall_colors.get(
+                            tile, settings.colors.minimap_wall_default
+                        )
 
                         pygame.draw.rect(
                             self.minimap_cache,

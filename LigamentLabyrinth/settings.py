@@ -22,10 +22,16 @@ class ColorPalette:
     
     minimap_background: Tuple[int, int, int] = (0, 0, 0)
     minimap_wall_default: Tuple[int, int, int] = (100, 100, 100)
-    minimap_wall_type2: Tuple[int, int, int] = (100, 50, 50)
-    minimap_wall_type3: Tuple[int, int, int] = (50, 100, 50)
     minimap_player: Tuple[int, int, int] = (255, 0, 0)
     minimap_entity: Tuple[int, int, int] = (255, 100, 100)
+    # Mapping of tile id -> minimap color. Use get(tile, minimap_wall_default) when rendering.
+    minimap_wall_colors: Dict[int, Tuple[int, int, int]] = field(default_factory=lambda: {
+        1: (100, 100, 100),
+        2: (100, 50, 50),
+        3: (50, 100, 50),
+        4: (50, 0, 50),
+        5: (122, 0, 5),
+    })
 
 palette = ColorPalette()
 

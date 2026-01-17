@@ -235,6 +235,10 @@ def render_floor_ceiling_numba(
     pos_z = 0.5 * screen_height * wall_height_factor
     epsilon = 1.0
     
+    # Precompute vignette constants (outside loops for performance)
+    vignette_radius_squared = vignette_radius * vignette_radius
+    vignette_denominator = 1.414 - vignette_radius + 0.001  # Constant for falloff calculation
+    
     # Parallelize the outer loop across CPU cores
     for y in numba.prange(floor_height):
         for x in range(floor_width):
@@ -261,15 +265,18 @@ def render_floor_ceiling_numba(
             else:
                 distance_factor = 1.0
             
-            # Calculate vignette effect
+            # Calculate vignette effect (optimized with squared distance)
             vignette_multiplier = 1.0
             if enable_vignette:
                 x_norm = (screen_x - screen_width / 2.0) / (screen_width / 2.0)
                 y_norm = (screen_y - screen_height / 2.0) / (screen_height / 2.0)
-                screen_dist = math.sqrt(x_norm * x_norm + y_norm * y_norm)
+                # Use squared distance for comparison to avoid sqrt
+                screen_dist_squared = x_norm * x_norm + y_norm * y_norm
                 
-                if screen_dist > vignette_radius:
-                    vignette_falloff = (screen_dist - vignette_radius) / (1.414 - vignette_radius + 0.001)
+                # Only compute sqrt if we're in the vignette region
+                if screen_dist_squared > vignette_radius_squared:
+                    screen_dist = math.sqrt(screen_dist_squared)
+                    vignette_falloff = (screen_dist - vignette_radius) / vignette_denominator
                     vignette_falloff = min(1.0, vignette_falloff)
                     vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
             
@@ -445,6 +452,10 @@ def render_walls_numba(
     
     depth_buffer = np.full(screen_width, max_depth, dtype=np.float32)
     
+    # Precompute vignette constants (outside loops for performance)
+    vignette_radius_squared = vignette_radius * vignette_radius
+    vignette_denominator = 1.414 - vignette_radius + 0.001  # Constant for falloff calculation
+    
     # Parallelize ray casting across CPU cores
     for ray_index in numba.prange(num_rays):
         screen_x = (2.0 * ray_index) / num_rays - 1.0
@@ -518,10 +529,13 @@ def render_walls_numba(
                     if enable_vignette:
                         x_norm = (screen_x_pos - screen_width / 2.0) / (screen_width / 2.0)
                         y_norm = (screen_y_pos - screen_height / 2.0) / (screen_height / 2.0)
-                        screen_dist = math.sqrt(x_norm * x_norm + y_norm * y_norm)
+                        # Use squared distance for comparison to avoid sqrt
+                        screen_dist_squared = x_norm * x_norm + y_norm * y_norm
                         
-                        if screen_dist > vignette_radius:
-                            vignette_falloff = (screen_dist - vignette_radius) / (1.414 - vignette_radius + 0.001)
+                        # Only compute sqrt if we're in the vignette region
+                        if screen_dist_squared > vignette_radius_squared:
+                            screen_dist = math.sqrt(screen_dist_squared)
+                            vignette_falloff = (screen_dist - vignette_radius) / vignette_denominator
                             vignette_falloff = min(1.0, vignette_falloff)
                             vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
                     

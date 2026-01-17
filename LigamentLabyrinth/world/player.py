@@ -153,3 +153,53 @@ class Player:
             else:
                 self.bob_offset_y = 0.0
                 self.bob_phase = 0.0
+    
+    def update(self, dt: float, keys_pressed, game_map: 'Map') -> None:
+        """Update player state based on input.
+        
+        Args:
+            dt: Delta time in seconds
+            keys_pressed: Dictionary/sequence of pressed keys from pygame
+            game_map: The game map for collision detection
+        """
+        total_dx = 0.0
+        total_dy = 0.0
+        
+        from pygame.locals import K_LSHIFT, K_RSHIFT, K_w, K_s, K_a, K_d
+        
+        is_sprinting = keys_pressed[K_LSHIFT] or keys_pressed[K_RSHIFT]
+        self.is_sprinting = is_sprinting
+        
+        move_speed = settings.player.move_speed * dt
+        if is_sprinting:
+            move_speed *= settings.player.sprint_multiplier
+        
+        if keys_pressed[K_w]:
+            total_dx += self._cos_cache * move_speed
+            total_dy += self._sin_cache * move_speed
+            
+        if keys_pressed[K_s]:
+            total_dx += -self._cos_cache * move_speed
+            total_dy += -self._sin_cache * move_speed
+            
+        if keys_pressed[K_a]:
+            total_dx += self._sin_cache * move_speed
+            total_dy += -self._cos_cache * move_speed
+            
+        if keys_pressed[K_d]:
+            total_dx += -self._sin_cache * move_speed
+            total_dy += self._cos_cache * move_speed
+
+        self.is_moving = (keys_pressed[K_w] or keys_pressed[K_s] or keys_pressed[K_a] or keys_pressed[K_d])
+
+        if self.is_moving:
+            current_speed = math.sqrt(total_dx**2 + total_dy**2)
+            if current_speed > move_speed:
+                scale = move_speed / current_speed
+                total_dx *= scale
+                total_dy *= scale
+
+        if total_dx != 0 or total_dy != 0:
+            self._move_with_collision(total_dx, total_dy, game_map)
+        
+        self.update_bobbing(dt)

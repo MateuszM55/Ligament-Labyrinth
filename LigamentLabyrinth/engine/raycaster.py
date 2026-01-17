@@ -156,6 +156,52 @@ class Raycaster:
         
         self.render_sprites(screen, player, game_map, depth_buffer)
     
+    def render(self, screen: pygame.Surface, player: Player, game_map: Map, glitch_intensity: float = 0.0) -> None:
+        """Render the complete 3D view.
+        
+        Args:
+            screen: Surface to render to
+            player: Player object
+            game_map: Game map
+            glitch_intensity: Glitch effect intensity (0.0 = off)
+        """
+        self.render_3d_view_numba(screen, player, game_map, glitch_intensity)
+    
+    @staticmethod
+    def calculate_glitch_intensity(game_map: Map, player: Player) -> float:
+        """Calculate dynamic glitch intensity based on closest monster distance.
+        
+        Args:
+            game_map: Game map containing monsters
+            player: Player object
+            
+        Returns:
+            Glitch intensity value (0.0 = no glitch, higher = more intense)
+        """
+        base_intensity = settings.render.glitch_intensity
+        
+        if not settings.render.glitch_enable_monster_proximity:
+            return base_intensity
+        
+        closest_distance = game_map.get_closest_monster_distance(player)
+        
+        if closest_distance == float('inf'):
+            return base_intensity
+        
+        start_dist = settings.render.glitch_monster_start_distance
+        max_dist = settings.render.glitch_monster_max_distance
+        max_intensity = settings.render.glitch_monster_max_intensity
+        
+        monster_glitch = 0.0
+        if closest_distance < start_dist:
+            if closest_distance <= max_dist:
+                monster_glitch = max_intensity
+            else:
+                progress = (start_dist - closest_distance) / (start_dist - max_dist)
+                monster_glitch = progress * max_intensity
+        
+        return max(base_intensity, monster_glitch)
+    
     def render_sprites(self, screen: pygame.Surface, player: Player, game_map: Map, depth_buffer: np.ndarray) -> None:
         """Render all sprites (monsters and collectibles) with depth buffer occlusion.
         

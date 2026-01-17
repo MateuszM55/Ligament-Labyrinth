@@ -187,3 +187,71 @@ class Map:
             self.sprite_data = np.array(sprite_list, dtype=np.float32)
         else:
             self.sprite_data = np.empty((0, 3), dtype=np.float32)
+    
+    def update(self, dt: float, player) -> None:
+        """Update all entities in the map.
+        
+        Args:
+            dt: Delta time in seconds
+            player: The player object for AI targeting
+        """
+        for monster in self.monsters:
+            monster.move_towards_player(player, dt)
+        
+        self.update_sprite_data()
+    
+    def check_monster_collisions(self, player) -> bool:
+        """Check if player collides with any monsters.
+        
+        Args:
+            player: The player object
+            
+        Returns:
+            True if collision detected, False otherwise
+        """
+        collision_distance_squared = settings.monster.collision_distance ** 2
+        
+        for monster in self.monsters:
+            distance_squared = monster.get_distance_squared_to_player(player)
+            
+            if distance_squared < collision_distance_squared:
+                return True
+        
+        return False
+    
+    def check_collectible_collisions(self, player) -> int:
+        """Check if player collects any collectibles.
+        
+        Args:
+            player: The player object
+            
+        Returns:
+            Number of collectibles collected this frame
+        """
+        collection_distance = settings.collectible.collection_distance
+        collected_count = 0
+        
+        for collectible in self.collectibles:
+            if collectible.check_collection(player, collection_distance):
+                collected_count += 1
+        
+        return collected_count
+    
+    def get_closest_monster_distance(self, player) -> float:
+        """Get distance to closest monster.
+        
+        Args:
+            player: The player object
+            
+        Returns:
+            Distance to closest monster, or infinity if no monsters
+        """
+        if not self.monsters:
+            return float('inf')
+        
+        closest_distance = float('inf')
+        for monster in self.monsters:
+            distance = monster.get_distance_to_player(player)
+            closest_distance = min(closest_distance, distance)
+        
+        return closest_distance

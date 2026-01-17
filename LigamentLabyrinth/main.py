@@ -79,10 +79,10 @@ class Game:
                 self.handle_mouse_motion(event)
                 
     def handle_keydown(self, event: pygame.event.Event) -> None:
-        """Handle key press events.
+        """Handle individual key press events.
         
         Args:
-            event: The pygame key event
+            event: The pygame key event.
         """
         if event.key == K_ESCAPE:
             self.running = False
@@ -90,10 +90,10 @@ class Game:
             self.set_paused(not self.paused)
 
     def set_paused(self, paused: bool) -> None:
-        """Set pause state and manage mouse visibility/grab.
+        """Update the game's pause state and toggle hardware input focus.
         
         Args:
-            paused: True to pause, False to unpause
+            paused: True to pause logic; False to resume.
         """
         self.paused = paused
         if self.paused:
@@ -126,10 +126,10 @@ class Game:
                 self.player.rotate_from_mouse(dx)
     
     def update(self, dt: float) -> None:
-        """Update game logic.
+        """Update game logic including physics, AI, and collision.
         
         Args:
-            dt: Delta time in seconds
+            dt: Delta time in seconds since the last frame.
         """
         if not self.paused:
             keys = pygame.key.get_pressed()
@@ -150,16 +150,18 @@ class Game:
                     for monster in self.entity_manager.monsters:
                         monster.speed_multiplier = settings.monster.speed_boost_multiplier
             
+            # Calculate glitch effect based on how close the monster is
             self.current_glitch_intensity = Raycaster.calculate_glitch_intensity(self.entity_manager, self.player)
             
+            # End game if any monster touches the player
             if self.entity_manager.check_collisions(self.player):
                 self.running = False
             
     def render(self) -> None:
-        """Render everything to the screen."""
+        """Clear the screen and render the 3D world, HUD, and UI elements."""
         self.screen.fill(settings.colors.black)
         
-        # Quick hack to keep Raycaster working without signature changes
+        # Synchronization hack: ensure map has newest sprite locations
         self.game_map.sprite_data = self.entity_manager.sprite_data
         
         self.raycaster.render(self.screen, self.player, self.game_map, self.current_glitch_intensity)

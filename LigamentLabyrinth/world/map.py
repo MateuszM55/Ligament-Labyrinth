@@ -4,10 +4,21 @@ from typing import List, Tuple, Any
 import numpy as np
 
 class Map:
-    """Represents the static geometry of the level (Walls, Floors, Ceilings)."""
+    """Represents the static geometry of the level (Walls, Floors, Ceilings).
+    
+    The map is stored as a 2D grid where values > 0 represent wall types.
+    """
     
     def __init__(self, grid: List[List[int]], player_start: Tuple[float, float], 
                  floor_grid: List[List[int]] = None, ceiling_grid: List[List[int]] = None) -> None:
+        """Initialize the map with grid data and player start position.
+
+        Args:
+            grid: 2D list for wall layout.
+            player_start: (x, y) coordinates for player spawn.
+            floor_grid: Optional 2D list for floor textures.
+            ceiling_grid: Optional 2D list for ceiling textures.
+        """
         self.grid = grid
         self.width = len(grid[0])
         self.height = len(grid)
@@ -25,7 +36,15 @@ class Map:
         self.ceiling_grid_array = np.array(ceiling_grid, dtype=np.int32)
 
     def is_wall(self, x: float, y: float) -> bool:
-        """Fast wall check."""
+        """Check if the given world coordinates are occupied by a wall.
+        
+        Args:
+            x: World X coordinate.
+            y: World Y coordinate.
+
+        Returns:
+            True if the tile is a wall, False otherwise.
+        """
         # Casting to int acts as floor()
         map_x, map_y = int(x), int(y)
         
@@ -35,9 +54,13 @@ class Map:
 
     @staticmethod
     def load_from_file(filename: str) -> Tuple['Map', List[dict], List[dict]]:
-        """
-        Loads the map file.
-        Returns: (MapInstance, monster_data_list, collectible_data_list)
+        """Load map data from a text file and associated texture maps.
+
+        Args:
+            filename: Path to the map text file.
+
+        Returns:
+            A tuple containing (Map object, monsters list, collectibles list).
         """
         grid = []
         player_start = (2.0, 2.0)
@@ -88,7 +111,16 @@ class Map:
 
     @staticmethod
     def _load_texture_map(filename: str, w: int, h: int) -> List[List[int]]:
-        """Helper to load floor/ceiling grids."""
+        """Helper to load auxiliary texture maps (floor/ceiling).
+
+        Args:
+            filename: Path to the texture map file.
+            w: Expected width for padding.
+            h: Expected height for padding.
+
+        Returns:
+            A 2D list of texture IDs.
+        """
         try:
             grid = []
             with open(filename, 'r') as f:

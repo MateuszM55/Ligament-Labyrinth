@@ -10,21 +10,21 @@ if TYPE_CHECKING:
     from world.player import Player
 
 class EntityManager:
-    """Manages all dynamic entities in the game world."""
+    """Manages all dynamic entities in the game world, including monsters and collectibles."""
     
     def __init__(self):
-        """Initialize the entity manager."""
+        """Initialize the entity manager with empty entity lists."""
         self.monsters: List[Monster] = []
         self.collectibles: List[Collectible] = []
         # Pre-allocate numpy array for rendering
         self.sprite_data: np.ndarray = np.empty((0, 3), dtype=np.float32)
 
     def load_entities(self, monster_data: List[dict], collectible_data: List[dict]):
-        """Populate the manager from data loaded by the Map.
+        """Populate the manager with entities from map data.
         
         Args:
-            monster_data: List of dictionaries containing monster position data
-            collectible_data: List of dictionaries containing collectible position data
+            monster_data: List of dictionaries containing monster position data.
+            collectible_data: List of dictionaries containing collectible position data.
         """
         for m in monster_data:
             # Random texture for monsters, or pass it in if your map file supports it
@@ -42,11 +42,11 @@ class EntityManager:
         self.update_sprite_data()
 
     def update(self, dt: float, player: 'Player'):
-        """Update AI and positions.
+        """Update all entities' states (AI movement, logic).
         
         Args:
-            dt: Delta time in seconds
-            player: Player object
+            dt: Delta time in seconds.
+            player: The player instance.
         """
         for monster in self.monsters:
             monster.move_towards_player(player, dt)
@@ -55,7 +55,7 @@ class EntityManager:
         self.update_sprite_data()
 
     def update_sprite_data(self):
-        """Flatten all entities into a numpy array for the Raycaster."""
+        """Flatten active entities into a NumPy array for optimized raycasting."""
         sprites = []
         
         for m in self.monsters:
@@ -71,13 +71,13 @@ class EntityManager:
             self.sprite_data = np.empty((0, 3), dtype=np.float32)
 
     def check_collisions(self, player: 'Player') -> bool:
-        """Check if player hit a monster (Game Over condition).
+        """Check if the player has collided with any monster.
         
         Args:
-            player: Player object
+            player: The player instance.
             
         Returns:
-            True if collision detected, False otherwise
+            True if a collision is detected (Game Over), False otherwise.
         """
         threshold_sq = settings.monster.collision_distance ** 2
         
@@ -87,13 +87,13 @@ class EntityManager:
         return False
 
     def check_collections(self, player: 'Player') -> int:
-        """Check if player picked up items.
+        """Check if the player has collected any items.
         
         Args:
-            player: Player object
+            player: The player instance.
             
         Returns:
-            Number of items collected this frame
+            The number of items collected in this update cycle.
         """
         count = 0
         dist = settings.collectible.collection_distance
@@ -104,13 +104,13 @@ class EntityManager:
         return count
 
     def get_closest_monster_distance(self, player: 'Player') -> float:
-        """Get the distance to the closest monster.
+        """Get the distance to the monster closest to the player.
         
         Args:
-            player: Player object
+            player: The player instance.
             
         Returns:
-            Distance to closest monster, or float('inf') if no monsters
+            The distance to closest monster, or float('inf') if no monsters.
         """
         if not self.monsters:
             return float('inf')

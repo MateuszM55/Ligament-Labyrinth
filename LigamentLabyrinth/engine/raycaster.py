@@ -125,6 +125,7 @@ class Raycaster:
             game_map: Game map
             glitch_intensity: Glitch effect intensity (0.0 = off)
         """
+        # 1. Render floors and ceilings first (background)
         self.render_floor_ceiling_vectorized(screen, player, game_map, glitch_intensity)
         
         screen_pixels = pygame.surfarray.pixels3d(screen)
@@ -132,6 +133,7 @@ class Raycaster:
         texture_arrays = self.asset_manager.get_wall_texture_arrays()
         texture_map = self.asset_manager.get_texture_map()
         
+        # 2. Cast rays and render walls
         render_walls_numba(
             screen_pixels,
             texture_arrays,
@@ -162,6 +164,7 @@ class Raycaster:
         
         del screen_pixels
         
+        # 3. Render dynamic objects (monsters, collectibles) with occlusion
         self.render_sprites(screen, player, game_map, self.depth_buffer)
     
     def render(self, screen: pygame.Surface, player: Player, game_map: Map, glitch_intensity: float = 0.0) -> None:

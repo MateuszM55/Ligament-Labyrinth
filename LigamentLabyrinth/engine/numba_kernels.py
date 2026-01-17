@@ -3,10 +3,18 @@
 
 import numpy as np
 import numba
+from numba import types
 import math
 
 
-@numba.njit(fastmath=True)
+@numba.njit(
+    types.Tuple((types.float64, types.int64, types.float64, types.float64, types.int64))(
+        types.float64, types.float64, types.float64,
+        types.int32[:, :], types.int64, types.int64, types.float64
+    ),
+    fastmath=True,
+    cache=True
+)
 def cast_ray_numba(
     player_x: float,
     player_y: float,
@@ -114,7 +122,38 @@ def cast_ray_numba(
     return distance, side, ray_dx, ray_dy, hit_val
 
 
-@numba.njit(fastmath=True, parallel=True)
+@numba.njit(
+    types.void(
+        types.uint8[:, :, :],      # buffer_pixels
+        types.uint8[:, :, :, :],   # floor_arrays
+        types.uint8[:, :, :, :],   # ceiling_arrays
+        types.int32[:, :],         # floor_grid
+        types.int32[:, :],         # ceiling_grid
+        types.int64,               # map_width
+        types.int64,               # map_height
+        types.int64,               # floor_width
+        types.int64,               # floor_height
+        types.int64,               # floor_scale
+        types.int64,               # screen_width
+        types.int64,               # screen_height
+        types.float64,             # player_x
+        types.float64,             # player_y
+        types.float64,             # player_rotation_rad
+        types.float64,             # fov_rad
+        types.float64,             # bob_offset_y
+        types.float64,             # wall_height_factor
+        types.boolean,             # enable_inverse_square
+        types.float64,             # light_intensity
+        types.float64,             # ambient_light
+        types.boolean,             # enable_vignette
+        types.float64,             # vignette_intensity
+        types.float64,             # vignette_radius
+        types.float64              # glitch_intensity
+    ),
+    fastmath=True,
+    parallel=True,
+    cache=True
+)
 def render_floor_ceiling_numba(
     buffer_pixels: np.ndarray,
     floor_arrays: np.ndarray,
@@ -305,7 +344,37 @@ def render_floor_ceiling_numba(
                 buffer_pixels[x, y, 2] = b
 
 
-@numba.njit(fastmath=True, parallel=True)
+@numba.njit(
+    types.float32[:](
+        types.uint8[:, :, :],      # screen_pixels
+        types.uint8[:, :, :, :],   # texture_arrays
+        types.int32[:],            # texture_map
+        types.float64,             # player_x
+        types.float64,             # player_y
+        types.float64,             # player_rotation_deg
+        types.int32[:, :],         # map_grid
+        types.int64,               # map_width
+        types.int64,               # map_height
+        types.int64,               # screen_width
+        types.int64,               # screen_height
+        types.float64,             # fov
+        types.float64,             # max_depth
+        types.int64,               # num_rays
+        types.float64,             # ray_width
+        types.float64,             # bob_offset_y
+        types.float64,             # wall_height_factor
+        types.boolean,             # enable_inverse_square
+        types.float64,             # light_intensity
+        types.float64,             # ambient_light
+        types.boolean,             # enable_vignette
+        types.float64,             # vignette_intensity
+        types.float64,             # vignette_radius
+        types.float64              # glitch_intensity
+    ),
+    fastmath=True,
+    parallel=True,
+    cache=True
+)
 def render_walls_numba(
     screen_pixels: np.ndarray,
     texture_arrays: np.ndarray,
@@ -489,7 +558,27 @@ def render_walls_numba(
     return depth_buffer
 
 
-@numba.njit(fastmath=True)
+@numba.njit(
+    types.float32[:, :](
+        types.float32[:, :],       # sprite_data
+        types.float64,             # player_x
+        types.float64,             # player_y
+        types.float64,             # player_rotation_deg
+        types.float64,             # fov
+        types.int64,               # screen_width
+        types.int64,               # screen_height
+        types.float64,             # max_depth
+        types.float64,             # wall_height_factor
+        types.float64,             # bob_offset_y
+        types.boolean,             # enable_inverse_square
+        types.float64,             # light_intensity
+        types.float64,             # ambient_light
+        types.float32[:],          # depth_buffer
+        types.UniTuple(types.int64, 3)  # collectible_texture_ids (tuple of 3 ints)
+    ),
+    fastmath=True,
+    cache=True
+)
 def process_sprites_numba(
     sprite_data: np.ndarray,
     player_x: float,

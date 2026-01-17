@@ -23,6 +23,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="engine\audio.py" />
+    <Compile Include="engine\minimap_renderer.py" />
     <Compile Include="LigamentLabyrinth\world\entity_manager.py" />
     <Compile Include="main.py" />
     <Compile Include="settings.py" />

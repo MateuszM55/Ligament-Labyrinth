@@ -12,6 +12,7 @@ from world.entity_manager import EntityManager
 from engine.assets import AssetManager
 from engine.raycaster import Raycaster
 from engine.audio import AudioManager
+from engine.minimap_renderer import MinimapRenderer
 
 
 class Game:
@@ -59,6 +60,9 @@ class Game:
             self.screen_height,
             self.asset_manager
         )
+
+        # Minimap renderer (separate from Raycaster)
+        self.minimap_renderer: MinimapRenderer = MinimapRenderer()
         
         self.audio_manager: AudioManager = AudioManager()
         self.audio_manager.play_music()
@@ -167,7 +171,7 @@ class Game:
         self.raycaster.render(self.screen, self.player, self.game_map, self.current_glitch_intensity)
         
         if settings.minimap.enabled:
-            self.raycaster.render_minimap(self.screen, self.player, self.game_map)
+            self.minimap_renderer.render(self.screen, self.player, self.game_map)
         
         if self.show_fps:
             fps_text = self.font.render(

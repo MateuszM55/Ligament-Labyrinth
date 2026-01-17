@@ -49,11 +49,7 @@ class Raycaster:
         
         # Pre-allocate depth buffer to avoid GC thrashing (reused every frame)
         self.depth_buffer: np.ndarray = np.full(screen_width, self.max_depth, dtype=np.float32)
-        
-        # Cache minimap static surface to avoid redrawing walls every frame
-        self.minimap_cache: pygame.Surface = None
-        self.minimap_cache_valid: bool = False
-        
+                
         # Cache darkened sprites to avoid recreating surfaces every frame
         # Key: (texture_id, width, height, quantized_light_factor)
         # Value: darkened pygame.Surface
@@ -278,78 +274,3 @@ class Raycaster:
                         self.darkened_sprite_cache[cache_key] = scaled_sprite
                 
                 screen.blit(scaled_sprite, (draw_start_x, draw_start_y))
-
-    def render_minimap(self, screen: pygame.Surface, player: Player, game_map: Map) -> None:
-        """Render 2D minimap overlay.
-        
-        Args:
-            screen: Surface to render to
-            player: Player object
-            game_map: Game map
-        """
-        minimap_size = settings.minimap.size
-        minimap_scale = minimap_size / max(game_map.width, game_map.height)
-        minimap_x = screen.get_width() - minimap_size - settings.minimap.margin
-        minimap_y = settings.minimap.margin
-        
-        # Generate static minimap cache if not valid
-        if not self.minimap_cache_valid:
-            self.minimap_cache = pygame.Surface((minimap_size, minimap_size))
-            self.minimap_cache.fill(settings.colors.minimap_background)
-            
-            # Draw all static walls once
-            for y in range(game_map.height):
-                for x in range(game_map.width):
-                    tile = game_map.grid[y][x]
-                    if tile > 0:
-                        tile_x = x * minimap_scale
-                        tile_y = y * minimap_scale
-                        
-                        color = settings.colors.minimap_wall_default
-                        if tile == 2:
-                            color = settings.colors.minimap_wall_type2
-                        if tile == 3:
-                            color = settings.colors.minimap_wall_type3
-                        
-                        pygame.draw.rect(
-                            self.minimap_cache, 
-                            color,
-                            (tile_x, tile_y, minimap_scale, minimap_scale)
-                        )
-            self.minimap_cache_valid = True
-        
-        # Blit cached static minimap
-        screen.blit(self.minimap_cache, (minimap_x, minimap_y))
-        
-        # Draw dynamic elements (monsters)
-        for i in range(game_map.sprite_data.shape[0]):
-            sprite_x_world = game_map.sprite_data[i, 0]
-            sprite_y_world = game_map.sprite_data[i, 1]
-            monster_x = minimap_x + sprite_x_world * minimap_scale
-            monster_y = minimap_y + sprite_y_world * minimap_scale
-            pygame.draw.circle(
-                screen,
-                (255, 100, 100),
-                (int(monster_x), int(monster_y)),
-                3
-            )
-        
-        player_x = minimap_x + player.x * minimap_scale
-        player_y = minimap_y + player.y * minimap_scale
-        pygame.draw.circle(
-            screen, 
-            settings.colors.minimap_player,
-            (int(player_x), int(player_y)), 
-            settings.minimap.player_dot_radius
-        )
-        
-        rad = math.radians(player.rotation)
-        end_x = player_x + math.cos(rad) * settings.minimap.direction_line_length
-        end_y = player_y + math.sin(rad) * settings.minimap.direction_line_length
-        pygame.draw.line(
-            screen, 
-            settings.colors.minimap_player,
-            (player_x, player_y), 
-            (end_x, end_y), 
-            settings.minimap.direction_line_width
-        )

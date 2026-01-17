@@ -15,13 +15,7 @@ if TYPE_CHECKING:
 class AudioManager:
     """Manages all audio playback including music, sound effects, and 3D audio."""
     
-    # Audio constants
-    SUPPORTED_EXTENSIONS = ('.wav', '.ogg', '.mp3')
-    MIXER_FREQ = 44100
-    MIXER_SIZE = -16
-    MIXER_CHANNELS = 2
-    MIXER_BUFFER = 512
-    TOTAL_CHANNELS = 32
+    # Audio constants were moved to settings.audio
 
     def __init__(self) -> None:
         """Initialize the audio manager and load sounds."""
@@ -50,12 +44,12 @@ class AudioManager:
         if not pygame.mixer.get_init():
             try:
                 pygame.mixer.init(
-                    frequency=self.MIXER_FREQ, 
-                    size=self.MIXER_SIZE, 
-                    channels=self.MIXER_CHANNELS, 
-                    buffer=self.MIXER_BUFFER
+                    frequency=settings.audio.mixer_freq,
+                    size=settings.audio.mixer_size,
+                    channels=settings.audio.mixer_channels,
+                    buffer=settings.audio.mixer_buffer,
                 )
-                pygame.mixer.set_num_channels(self.TOTAL_CHANNELS)
+                pygame.mixer.set_num_channels(settings.audio.total_channels)
             except pygame.error as e:
                 print(f"Warning: Could not initialize audio mixer. {e}")
 
@@ -65,7 +59,7 @@ class AudioManager:
 
     def _find_file_with_ext(self, directory: str, base_name: str) -> Optional[str]:
         """Helper to find a file checking multiple audio extensions."""
-        for ext in self.SUPPORTED_EXTENSIONS:
+        for ext in settings.audio.supported_extensions:
             path = os.path.join(directory, f"{base_name}{ext}")
             if os.path.exists(path):
                 return path

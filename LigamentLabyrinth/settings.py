@@ -137,6 +137,12 @@ class AudioSettings:
     monster_sound_min_volume: float = 0.05
     max_audio_distance: float = 5.0
     enable_3d_audio: bool = True
+    supported_extensions: tuple = ('.wav', '.ogg', '.mp3')
+    mixer_freq: int = 44100
+    mixer_size: int = -16
+    mixer_channels: int = 2
+    mixer_buffer: int = 512
+    total_channels: int = 32
 
 
 @dataclass(frozen=True)

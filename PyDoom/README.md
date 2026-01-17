@@ -1,10 +1,10 @@
-# PyDoom
+# Ligament Labyrinth
 
-A raycasting game engine inspired by Doom, built with Python and Pygame.
+A raycasting game engine with horror elements, built with Python and Pygame.
 
 ## Description
 
-PyDoom is a 3D raycasting engine that creates a first-person perspective game similar to classic Doom. The engine features:
+Ligament Labyrinth is a 3D raycasting engine that creates a first-person perspective horror game. The engine features:
 
 - Real-time raycasting rendering with textured walls, floors, and ceilings
 - Numba-optimized rendering for high performance
@@ -65,4 +65,4 @@ This project is for educational purposes.
 
 ## Credits
 
-Inspired by the classic Doom engine and raycasting techniques.
+Inspired by classic raycasting techniques and horror game design.

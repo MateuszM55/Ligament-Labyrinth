@@ -1,1 +1,1 @@
-"""Test package for PyDoom."""
+"""Test package for Ligament Labyrinth."""

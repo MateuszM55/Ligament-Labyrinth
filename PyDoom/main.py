@@ -1,4 +1,4 @@
-"""Ligament Labyrinth - A raycasting game engine inspired by Doom."""
+"""Ligament Labyrinth - A raycasting horror game engine."""
 
 import sys
 import math

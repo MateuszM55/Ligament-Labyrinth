@@ -1,4 +1,4 @@
-"""Test runner script for PyDoom project."""
+"""Test runner script for Ligament Labyrinth project."""
 
 import sys
 import subprocess
@@ -6,7 +6,7 @@ import subprocess
 
 def run_tests():
     """Run all tests using pytest."""
-    print("Running PyDoom tests...")
+    print("Running Ligament Labyrinth tests...")
     print("-" * 50)
     
     result = subprocess.run(

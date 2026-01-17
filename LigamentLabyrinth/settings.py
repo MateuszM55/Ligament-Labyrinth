@@ -1,7 +1,33 @@
 """Configuration and constants for Ligament Labyrinth raycasting engine."""
-
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing import Tuple, Dict
+
+@dataclass(frozen=True)
+class ColorPalette:
+    """Color constants used throughout the game."""
+    black: Tuple[int, int, int] = (0, 0, 0)
+    white: Tuple[int, int, int] = (255, 255, 255)
+    red: Tuple[int, int, int] = (255, 0, 0)
+    green: Tuple[int, int, int] = (0, 255, 0)
+    blue: Tuple[int, int, int] = (0, 0, 255)
+    
+    wall_gray: Tuple[Tuple[int, int, int], Tuple[int, int, int]] = ((150, 150, 150), (100, 100, 100))
+    wall_red:  Tuple[Tuple[int, int, int], Tuple[int, int, int]] = ((150, 100, 100), (100, 50, 50))
+    wall_green: Tuple[Tuple[int, int, int], Tuple[int, int, int]] = ((100, 150, 100), (50, 100, 50))
+    
+    floor_primary: Tuple[int, int, int] = (80, 80, 80)
+    floor_secondary: Tuple[int, int, int] = (60, 60, 60)
+    ceiling_primary: Tuple[int, int, int] = (40, 40, 60)
+    ceiling_secondary: Tuple[int, int, int] = (30, 30, 50)
+    
+    minimap_background: Tuple[int, int, int] = (0, 0, 0)
+    minimap_wall_default: Tuple[int, int, int] = (100, 100, 100)
+    minimap_wall_type2: Tuple[int, int, int] = (100, 50, 50)
+    minimap_wall_type3: Tuple[int, int, int] = (50, 100, 50)
+    minimap_player: Tuple[int, int, int] = (255, 0, 0)
+
+# Create a global instance early so defaults can use it
+palette = ColorPalette()
 
 
 @dataclass(frozen=True)
@@ -22,13 +48,12 @@ class RenderSettings:
     floor_ceiling_ray_resolution_divisor: int = 1
     wall_height_factor: float = 1.0
     sprite_scale: float = 1.0
-    glitch_intensity: float = 0.0  # LSD Glitch effect intensity (0=off, higher values=more intense)
+    glitch_intensity: float = 0.0
     
-    # Monster proximity glitch effect settings
-    glitch_enable_monster_proximity: bool = True  # Enable dynamic glitch based on monster distance
-    glitch_monster_start_distance: float = 5.0  # Distance where glitch starts to appear
-    glitch_monster_max_distance: float = 0.0  # Distance where glitch is at maximum intensity
-    glitch_monster_max_intensity: float = 20.0  # Maximum glitch intensity when monster is very close (2.0+ for dramatic effect)
+    glitch_enable_monster_proximity: bool = True
+    glitch_monster_start_distance: float = 5.0
+    glitch_monster_max_distance: float = 0.0
+    glitch_monster_max_intensity: float = 20.0
 
 
 @dataclass(frozen=True)
@@ -37,10 +62,8 @@ class PlayerSettings:
     move_speed: float = 3.0
     mouse_sensitivity: float = 0.2
     collision_radius: float = 0.2
-    
     bob_amplitude: float = 5.0
     bob_frequency: float = 1.0
-    
     sprint_multiplier: float = 1.5
     sprint_bob_multiplier: float = 2.0
 
@@ -50,7 +73,7 @@ class MonsterSettings:
     """Monster/enemy configuration."""
     move_speed: float = 1.5
     collision_distance: float = 0.3
-    speed_boost_multiplier: float = 3.0  # Speed multiplier when all collectibles are obtained
+    speed_boost_multiplier: float = 3.0
 
 
 @dataclass(frozen=True)
@@ -58,7 +81,7 @@ class CollectibleSettings:
     """Collectible item configuration."""
     total_count: int = 3
     collection_distance: float = 0.5
-    texture_ids: tuple = (15,15,15)  # Texture IDs for each collectible
+    texture_ids: tuple = (15, 15, 15)
 
 
 @dataclass(frozen=True)
@@ -69,33 +92,16 @@ class MapSettings:
 
 @dataclass(frozen=True)
 class AssetSettings:
+    """Asset loading configuration."""
     texture_directory: str = "textures"
     texture_size: int = 512
-    default_texture_colors: dict = field(default_factory=lambda: {
-        1: ((150, 150, 150), (100, 100, 100)),
-        2: ((150, 100, 100), (100, 50, 50)),
-        3: ((100, 150, 100), (50, 100, 50))
+    
+    # 2. USE THE PALETTE INSTANCE HERE
+    default_texture_colors: Dict[int, Tuple] = field(default_factory=lambda: {
+        1: palette.wall_gray,
+        2: palette.wall_red,
+        3: palette.wall_green
     })
-    
-@dataclass(frozen=True)
-class ColorPalette:
-    """Color constants used throughout the game."""
-    black: Tuple[int, int, int] = (0, 0, 0)
-    white: Tuple[int, int, int] = (255, 255, 255)
-    red: Tuple[int, int, int] = (255, 0, 0)
-    green: Tuple[int, int, int] = (0, 255, 0)
-    blue: Tuple[int, int, int] = (0, 0, 255)
-    
-    floor_primary: Tuple[int, int, int] = (80, 80, 80)
-    floor_secondary: Tuple[int, int, int] = (60, 60, 60)
-    ceiling_primary: Tuple[int, int, int] = (40, 40, 60)
-    ceiling_secondary: Tuple[int, int, int] = (30, 30, 50)
-    
-    minimap_background: Tuple[int, int, int] = (0, 0, 0)
-    minimap_wall_default: Tuple[int, int, int] = (100, 100, 100)
-    minimap_wall_type2: Tuple[int, int, int] = (100, 50, 50)
-    minimap_wall_type3: Tuple[int, int, int] = (50, 100, 50)
-    minimap_player: Tuple[int, int, int] = (255, 0, 0)
 
 
 @dataclass(frozen=True)
@@ -111,16 +117,13 @@ class MinimapSettings:
 
 @dataclass(frozen=True)
 class LightingSettings:
-    """Advanced lighting configuration for horror atmosphere."""
-    # Inverse square law (distance falloff)
+    """Advanced lighting configuration."""
     enable_inverse_square: bool = True
-    light_intensity: float = 1  # Base light power that emits from the player
-    ambient_light: float = 0.03  # Minimum light level everywhere (0-1)
-    
-    # Vignette effect (darkens screen edges for tunnel vision/horror effect)
+    light_intensity: float = 1.0
+    ambient_light: float = 0.03
     enable_vignette: bool = True
-    vignette_intensity: float = 1  # 0-1, multiplier for edge darkening (0=no effect, 1=maximum darkness at edges)
-    vignette_radius: float = 0.5  # Size of the clear center 'circle' (0 = whole screen is dark, 1 = effect only visible at edges)
+    vignette_intensity: float = 1.0
+    vignette_radius: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -128,27 +131,21 @@ class AudioSettings:
     """Audio and sound configuration."""
     sounds_directory: str = "sounds"
     music_directory: str = "music"
-    
-    # Volume levels (0.0 to 1.0)
     master_volume: float = 1.0
-    music_volume: float = 1
+    music_volume: float = 1.0
     sfx_volume: float = 0.2
-    
-    # Footstep settings
-    footstep_interval: float = 0.4  # Time between footstep sounds in seconds (walking)
-    footstep_sprint_interval: float = 0.25  # Time between footstep sounds when sprinting
-    
-    # Monster sound settings
-    monster_sound_min_volume: float = 0.05  # Minimum volume for monster sounds
-    
-    # 3D Audio settings
-    max_audio_distance: float = 5.0  # Maximum distance for sound 
-    enable_3d_audio: bool = True  # Enable distance-based volume scaling
+    footstep_interval: float = 0.4
+    footstep_sprint_interval: float = 0.25
+    monster_sound_min_volume: float = 0.05
+    max_audio_distance: float = 5.0
+    enable_3d_audio: bool = True
 
 
 @dataclass(frozen=True)
 class GameSettings:
     """Master settings container."""
+    colors: ColorPalette = palette 
+    
     display: DisplaySettings = DisplaySettings()
     render: RenderSettings = RenderSettings()
     player: PlayerSettings = PlayerSettings()
@@ -156,13 +153,11 @@ class GameSettings:
     collectible: CollectibleSettings = CollectibleSettings()
     map: MapSettings = MapSettings()
     assets: AssetSettings = AssetSettings()
-    colors: ColorPalette = ColorPalette()
     minimap: MinimapSettings = MinimapSettings()
     lighting: LightingSettings = LightingSettings()
     audio: AudioSettings = AudioSettings()
     
     show_fps: bool = True
-
 
 # Global settings instance
 settings = GameSettings()

@@ -31,6 +31,8 @@
     <Compile Include="engine\numba_kernels.py" />
     <Compile Include="engine\raycaster.py" />
     <Compile Include="engine\__init__.py" />
+    <Compile Include="test_audio_manager.py" />
+    <Compile Include="test_settings.py" />
     <Compile Include="world\collectible.py" />
     <Compile Include="world\entity.py" />
     <Compile Include="world\map.py" />

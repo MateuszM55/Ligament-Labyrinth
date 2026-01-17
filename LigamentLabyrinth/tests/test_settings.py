@@ -1,4 +1,5 @@
 """Unit tests for settings module."""
+#AI generated
 
 import unittest
 from settings import (

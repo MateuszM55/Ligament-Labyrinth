@@ -1,4 +1,5 @@
-"""Unit tests for Map class."""
+"""Unit tests for the Map class."""
+#AI generated
 
 import unittest
 import tempfile
@@ -11,15 +12,16 @@ class TestMap(unittest.TestCase):
     
     def test_map_dimensions(self):
         """Test that loaded map has valid dimensions."""
-        # Create a temporary test map
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("1 1 1\n")
-            f.write("1 0 1\n")
-            f.write("1 1 1\n")
+            f.write("111\n")
+            f.write("101\n")
+            f.write("111\n")
             temp_map = f.name
         
         try:
-            game_map = Map.load_from_file(temp_map)
+            game_map, _, _ = Map.load_from_file(temp_map)
+            
             self.assertEqual(game_map.width, 3)
             self.assertEqual(game_map.height, 3)
             self.assertIsNotNone(game_map.grid)
@@ -29,13 +31,14 @@ class TestMap(unittest.TestCase):
     def test_map_has_player_start(self):
         """Test that map has player start position."""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("1 1 1\n")
-            f.write("1 P 1\n")
-            f.write("1 1 1\n")
+            f.write("111\n")
+            f.write("1P1\n")
+            f.write("111\n")
             temp_map = f.name
         
         try:
-            game_map = Map.load_from_file(temp_map)
+            game_map, _, _ = Map.load_from_file(temp_map)
+            
             self.assertIsNotNone(game_map.player_start)
             self.assertIsInstance(game_map.player_start, tuple)
             self.assertEqual(len(game_map.player_start), 2)

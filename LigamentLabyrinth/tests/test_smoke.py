@@ -1,4 +1,5 @@
 """Smoke test - verify the game can be imported and initialized without crashing."""
+#AI generated
 
 import unittest
 import sys

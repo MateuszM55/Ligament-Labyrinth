@@ -57,7 +57,7 @@ class MinimapRenderer:
             monster_y = minimap_y + sprite_y_world * minimap_scale
             pygame.draw.circle(
                 screen,
-                (255, 100, 100),
+                settings.colors.minimap_entity,
                 (int(monster_x), int(monster_y)),
                 3
             )

@@ -25,6 +25,7 @@ class ColorPalette:
     minimap_wall_type2: Tuple[int, int, int] = (100, 50, 50)
     minimap_wall_type3: Tuple[int, int, int] = (50, 100, 50)
     minimap_player: Tuple[int, int, int] = (255, 0, 0)
+    minimap_entity: Tuple[int, int, int] = (255, 100, 100)
 
 palette = ColorPalette()
 

@@ -234,17 +234,14 @@ def render_floor_ceiling_numba(
                     vignette_falloff = min(1.0, vignette_falloff)
                     vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
             
-            # Combine lighting effects with glitch
-            if glitch_intensity > 0:
-                # "Corrupted Flashlight" effect: Light itself fuels the glitch
-                # The brighter the light, the more intense the negative overflow
-                base_lighting = distance_factor * vignette_multiplier
-                corruption_multiplier = 1.0 - glitch_intensity
-                final_lighting = base_lighting * corruption_multiplier
-            else:
-                # Normal behavior: Clamp to valid range
-                final_lighting = distance_factor * vignette_multiplier
-                final_lighting = max(0.0, min(1.0, final_lighting))
+            # Combine lighting effects with glitch (branchless)
+            # "Corrupted Flashlight" effect: Light itself fuels the glitch
+            # The brighter the light, the more intense the negative overflow
+            base_lighting = distance_factor * vignette_multiplier
+            corruption_multiplier = 1.0 - glitch_intensity
+            final_lighting = base_lighting * corruption_multiplier
+            # When glitch_intensity == 0, this behaves normally (corruption_multiplier = 1.0)
+            # When glitch_intensity > 0, lighting gets darker enabling color wrapping effects
             
             # Get map tile coordinates
             map_x = int(world_x)
@@ -270,27 +267,18 @@ def render_floor_ceiling_numba(
                 tex_x = int(world_x * floor_tex_width) & floor_tex_mask
                 tex_y = int(world_y * floor_tex_height) & floor_tex_mask
                 
-                # Apply lighting with potential wrapping for glitch effect
-                if glitch_intensity > 0:
-                    # Allow integer overflow/underflow for psychedelic color banding
-                    r = int(floor_arrays[floor_tex_id, tex_x, tex_y, 0] * final_lighting) % 256
-                    g = int(floor_arrays[floor_tex_id, tex_x, tex_y, 1] * final_lighting) % 256
-                    b = int(floor_arrays[floor_tex_id, tex_x, tex_y, 2] * final_lighting) % 256
-                    # Handle negative values (wrap from 255)
-                    if r < 0:
-                        r = (r % 256 + 256) % 256
-                    if g < 0:
-                        g = (g % 256 + 256) % 256
-                    if b < 0:
-                        b = (b % 256 + 256) % 256
-                    buffer_pixels[x, y, 0] = r
-                    buffer_pixels[x, y, 1] = g
-                    buffer_pixels[x, y, 2] = b
-                else:
-                    # Normal rendering with clamping
-                    buffer_pixels[x, y, 0] = int(floor_arrays[floor_tex_id, tex_x, tex_y, 0] * final_lighting)
-                    buffer_pixels[x, y, 1] = int(floor_arrays[floor_tex_id, tex_x, tex_y, 1] * final_lighting)
-                    buffer_pixels[x, y, 2] = int(floor_arrays[floor_tex_id, tex_x, tex_y, 2] * final_lighting)
+                # Apply lighting with potential wrapping for glitch effect (branchless)
+                # Always use modulo wrapping - when glitch_intensity is 0, values stay in valid range naturally
+                r = int(floor_arrays[floor_tex_id, tex_x, tex_y, 0] * final_lighting) % 256
+                g = int(floor_arrays[floor_tex_id, tex_x, tex_y, 1] * final_lighting) % 256
+                b = int(floor_arrays[floor_tex_id, tex_x, tex_y, 2] * final_lighting) % 256
+                # Handle negative values (wrap from 255)
+                r = (r + 256) % 256
+                g = (g + 256) % 256
+                b = (b + 256) % 256
+                buffer_pixels[x, y, 0] = r
+                buffer_pixels[x, y, 1] = g
+                buffer_pixels[x, y, 2] = b
             
             
             elif p < -epsilon:
@@ -303,27 +291,18 @@ def render_floor_ceiling_numba(
                 tex_x = int(world_x * ceiling_tex_width) & ceiling_tex_mask
                 tex_y = int(world_y * ceiling_tex_height) & ceiling_tex_mask
                 
-                # Apply lighting with potential wrapping for glitch effect
-                if glitch_intensity > 0:
-                    # Allow integer overflow/underflow for psychedelic color banding
-                    r = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 0] * final_lighting) % 256
-                    g = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 1] * final_lighting) % 256
-                    b = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 2] * final_lighting) % 256
-                    # Handle negative values (wrap from 255)
-                    if r < 0:
-                        r = (r % 256 + 256) % 256
-                    if g < 0:
-                        g = (g % 256 + 256) % 256
-                    if b < 0:
-                        b = (b % 256 + 256) % 256
-                    buffer_pixels[x, y, 0] = r
-                    buffer_pixels[x, y, 1] = g
-                    buffer_pixels[x, y, 2] = b
-                else:
-                    # Normal rendering with clamping
-                    buffer_pixels[x, y, 0] = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 0] * final_lighting)
-                    buffer_pixels[x, y, 1] = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 1] * final_lighting)
-                    buffer_pixels[x, y, 2] = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 2] * final_lighting)
+                # Apply lighting with potential wrapping for glitch effect (branchless)
+                # Always use modulo wrapping - when glitch_intensity is 0, values stay in valid range naturally
+                r = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 0] * final_lighting) % 256
+                g = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 1] * final_lighting) % 256
+                b = int(ceiling_arrays[ceiling_tex_id, tex_x, tex_y, 2] * final_lighting) % 256
+                # Handle negative values (wrap from 255)
+                r = (r + 256) % 256
+                g = (g + 256) % 256
+                b = (b + 256) % 256
+                buffer_pixels[x, y, 0] = r
+                buffer_pixels[x, y, 1] = g
+                buffer_pixels[x, y, 2] = b
 
 
 @numba.njit(fastmath=True, parallel=True)
@@ -477,17 +456,14 @@ def render_walls_numba(
                             vignette_falloff = min(1.0, vignette_falloff)
                             vignette_multiplier = 1.0 - (vignette_falloff * vignette_intensity)
                     
-                    # Combine all lighting effects with glitch
-                    if glitch_intensity > 0:
-                        # "Corrupted Flashlight" effect: Light itself fuels the glitch
-                        # The brighter the light, the more intense the negative overflow
-                        base_lighting = lighting_multiplier * vignette_multiplier
-                        corruption_multiplier = 1.0 - glitch_intensity
-                        final_lighting = base_lighting * corruption_multiplier
-                    else:
-                        # Normal behavior: Clamp to valid range
-                        final_lighting = lighting_multiplier * vignette_multiplier
-                        final_lighting = max(0.0, min(1.0, final_lighting))
+                    # Combine all lighting effects with glitch (branchless)
+                    # "Corrupted Flashlight" effect: Light itself fuels the glitch
+                    # The brighter the light, the more intense the negative overflow
+                    base_lighting = lighting_multiplier * vignette_multiplier
+                    corruption_multiplier = 1.0 - glitch_intensity
+                    final_lighting = base_lighting * corruption_multiplier
+                    # When glitch_intensity == 0, this behaves normally (corruption_multiplier = 1.0)
+                    # When glitch_intensity > 0, lighting gets darker enabling color wrapping effects
                     
                     y_ratio = (screen_y_pos - wall_top) / wall_height
                     tex_y = int(y_ratio * tex_height)
@@ -497,27 +473,18 @@ def render_walls_numba(
                     g = texture_arrays[texture_idx, tex_x, tex_y, 1]
                     b = texture_arrays[texture_idx, tex_x, tex_y, 2]
                     
-                    # Apply lighting with potential wrapping for glitch effect
-                    if glitch_intensity > 0:
-                        # Allow integer overflow/underflow for psychedelic color banding
-                        r_lit = int(r * final_lighting) % 256
-                        g_lit = int(g * final_lighting) % 256
-                        b_lit = int(b * final_lighting) % 256
-                        # Handle negative values (wrap from 255)
-                        if r_lit < 0:
-                            r_lit = (r_lit % 256 + 256) % 256
-                        if g_lit < 0:
-                            g_lit = (g_lit % 256 + 256) % 256
-                        if b_lit < 0:
-                            b_lit = (b_lit % 256 + 256) % 256
-                        screen_pixels[screen_x_pos, screen_y_pos, 0] = r_lit
-                        screen_pixels[screen_x_pos, screen_y_pos, 1] = g_lit
-                        screen_pixels[screen_x_pos, screen_y_pos, 2] = b_lit
-                    else:
-                        # Normal rendering with clamping
-                        screen_pixels[screen_x_pos, screen_y_pos, 0] = int(r * final_lighting)
-                        screen_pixels[screen_x_pos, screen_y_pos, 1] = int(g * final_lighting)
-                        screen_pixels[screen_x_pos, screen_y_pos, 2] = int(b * final_lighting)
+                    # Apply lighting with potential wrapping for glitch effect (branchless)
+                    # Always use modulo wrapping - when glitch_intensity is 0, values stay in valid range naturally
+                    r_lit = int(r * final_lighting) % 256
+                    g_lit = int(g * final_lighting) % 256
+                    b_lit = int(b * final_lighting) % 256
+                    # Handle negative values (wrap from 255)
+                    r_lit = (r_lit + 256) % 256
+                    g_lit = (g_lit + 256) % 256
+                    b_lit = (b_lit + 256) % 256
+                    screen_pixels[screen_x_pos, screen_y_pos, 0] = r_lit
+                    screen_pixels[screen_x_pos, screen_y_pos, 1] = g_lit
+                    screen_pixels[screen_x_pos, screen_y_pos, 2] = b_lit
     
     return depth_buffer
 

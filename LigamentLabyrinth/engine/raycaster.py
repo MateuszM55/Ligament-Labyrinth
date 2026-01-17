@@ -47,6 +47,9 @@ class Raycaster:
         # Cache floor/ceiling buffer to avoid recreating every frame
         self.floor_ceiling_buffer: pygame.Surface = pygame.Surface((self.floor_width, self.floor_height))
         
+        # Pre-allocate depth buffer to avoid GC thrashing (reused every frame)
+        self.depth_buffer: np.ndarray = np.full(screen_width, self.max_depth, dtype=np.float32)
+        
         # Cache minimap static surface to avoid redrawing walls every frame
         self.minimap_cache: pygame.Surface = None
         self.minimap_cache_valid: bool = False
@@ -129,7 +132,7 @@ class Raycaster:
         texture_arrays = self.asset_manager.get_wall_texture_arrays()
         texture_map = self.asset_manager.get_texture_map()
         
-        depth_buffer = render_walls_numba(
+        render_walls_numba(
             screen_pixels,
             texture_arrays,
             texture_map,
@@ -153,12 +156,13 @@ class Raycaster:
             settings.lighting.enable_vignette,
             settings.lighting.vignette_intensity,
             settings.lighting.vignette_radius,
-            glitch_intensity  # Use dynamic glitch intensity
+            glitch_intensity,
+            self.depth_buffer  # Pass pre-allocated depth buffer
         )
         
         del screen_pixels
         
-        self.render_sprites(screen, player, game_map, depth_buffer)
+        self.render_sprites(screen, player, game_map, self.depth_buffer)
     
     def render(self, screen: pygame.Surface, player: Player, game_map: Map, glitch_intensity: float = 0.0) -> None:
         """Render the complete 3D view.

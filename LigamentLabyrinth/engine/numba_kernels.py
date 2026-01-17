@@ -241,15 +241,25 @@ def render_floor_ceiling_numba(
     
     # Parallelize the outer loop across CPU cores
     for y in numba.prange(floor_height):
+        screen_y = y * floor_scale
+        p = screen_y - screen_half
+        
+        if abs(p) < epsilon:
+            p = epsilon if p >= 0 else -epsilon
+        
+        # Calculate row properties ONCE per row (not per pixel)
+        # This reduces ~920,000 divisions to ~720 for a 1280x720 screen
+        row_distance = pos_z / abs(p)
+        
+        # Distance-based lighting is also constant per row
+        if enable_inverse_square:
+            distance_factor = light_intensity / (row_distance * row_distance + 0.1)
+            distance_factor = max(ambient_light, min(1.0, distance_factor))
+        else:
+            distance_factor = 1.0
+        
         for x in range(floor_width):
-            screen_y = y * floor_scale
             screen_x = x * floor_scale
-            p = screen_y - screen_half
-            
-            if abs(p) < epsilon:
-                p = epsilon if p >= 0 else -epsilon
-            
-            row_distance = pos_z / abs(p)
             
             screen_x_norm = (2.0 * x / floor_width) - 1.0
             ray_dir_x = player_cos + plane_x * screen_x_norm
@@ -257,13 +267,6 @@ def render_floor_ceiling_numba(
             
             world_x = player_x + ray_dir_x * row_distance
             world_y = player_y + ray_dir_y * row_distance
-            
-            # Calculate distance-based lighting
-            if enable_inverse_square:
-                distance_factor = light_intensity / (row_distance * row_distance + 0.1)
-                distance_factor = max(ambient_light, min(1.0, distance_factor))
-            else:
-                distance_factor = 1.0
             
             # Calculate vignette effect (optimized with squared distance)
             vignette_multiplier = 1.0
@@ -352,7 +355,7 @@ def render_floor_ceiling_numba(
 
 
 @numba.njit(
-    types.float32[:](
+types.void(
         types.uint8[:, :, :],      # screen_pixels
         types.uint8[:, :, :, :],   # texture_arrays
         types.int32[:],            # texture_map
@@ -376,7 +379,8 @@ def render_floor_ceiling_numba(
         types.boolean,             # enable_vignette
         types.float64,             # vignette_intensity
         types.float64,             # vignette_radius
-        types.float64              # glitch_intensity
+        types.float64,             # glitch_intensity
+        types.float32[:]           # depth_buffer (passed in, modified in-place)
     ),
     fastmath=True,
     parallel=True,
@@ -406,8 +410,9 @@ def render_walls_numba(
     enable_vignette: bool,
     vignette_intensity: float,
     vignette_radius: float,
-    glitch_intensity: float
-) -> np.ndarray:
+    glitch_intensity: float,
+    depth_buffer: np.ndarray
+) -> None:
     """Render walls using Numba optimization with advanced horror lighting.
     
     Args:
@@ -435,9 +440,7 @@ def render_walls_numba(
         vignette_intensity: Vignette darkness (0-1)
         vignette_radius: Vignette start radius (0-1)
         glitch_intensity: LSD Glitch effect intensity (0=off, higher=more intense)
-        
-    Returns:
-        Depth buffer array of shape (screen_width,) with distance for each column
+        depth_buffer: Pre-allocated depth buffer (screen_width,) to fill with distances
     """
     half_fov_rad = math.radians(fov / 2.0)
     tan_half_fov = math.tan(half_fov_rad)
@@ -450,11 +453,12 @@ def render_walls_numba(
     # Precompute texture mask for bitwise AND (assumes power-of-2 textures)
     tex_mask = tex_width - 1
     
-    depth_buffer = np.full(screen_width, max_depth, dtype=np.float32)
-    
     # Precompute vignette constants (outside loops for performance)
     vignette_radius_squared = vignette_radius * vignette_radius
     vignette_denominator = 1.414 - vignette_radius + 0.001  # Constant for falloff calculation
+    
+    # Reset depth buffer for this frame (avoids reallocation)
+    depth_buffer[:] = max_depth
     
     # Parallelize ray casting across CPU cores
     for ray_index in numba.prange(num_rays):
@@ -568,8 +572,6 @@ def render_walls_numba(
                     screen_pixels[screen_x_pos, screen_y_pos, 0] = r_lit
                     screen_pixels[screen_x_pos, screen_y_pos, 1] = g_lit
                     screen_pixels[screen_x_pos, screen_y_pos, 2] = b_lit
-    
-    return depth_buffer
 
 
 @numba.njit(
@@ -645,7 +647,10 @@ def process_sprites_numba(
     tan_half_fov = math.tan(half_fov)
     aspect_ratio = screen_width / screen_height
     
-    visible_sprites = []
+    # Pre-allocate array with maximum possible size (num_sprites x 6 properties)
+    # This avoids Python list append overhead which destroys Numba performance
+    visible_sprites_array = np.empty((num_sprites, 6), dtype=np.float32)
+    count = 0
     
     for i in range(num_sprites):
         sprite_x_world = sprite_data[i, 0]
@@ -706,12 +711,20 @@ def process_sprites_numba(
                 light_factor = min(1.0, light_intensity / (distance * distance + 0.1))
                 light_factor = max(ambient_light, light_factor)
             
-            visible_sprites.append((distance, screen_x, sprite_height, sprite_width, texture_id, light_factor))
+            # Fill the pre-allocated array instead of appending to Python list
+            visible_sprites_array[count, 0] = distance
+            visible_sprites_array[count, 1] = screen_x
+            visible_sprites_array[count, 2] = sprite_height
+            visible_sprites_array[count, 3] = sprite_width
+            visible_sprites_array[count, 4] = texture_id
+            visible_sprites_array[count, 5] = light_factor
+            count += 1
     
-    if len(visible_sprites) == 0:
+    if count == 0:
         return np.empty((0, 6), dtype=np.float32)
     
-    visible_sprites_array = np.array(visible_sprites, dtype=np.float32)
+    # Slice array to only include valid sprites
+    visible_sprites_array = visible_sprites_array[:count]
     
     indices = np.argsort(-visible_sprites_array[:, 0])
     sorted_sprites = visible_sprites_array[indices]

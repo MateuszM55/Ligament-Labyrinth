@@ -3,8 +3,6 @@
 import math
 from typing import TYPE_CHECKING
 
-from world.entity_utils import distance_to_player, distance_squared_to_player
-
 if TYPE_CHECKING:
     from world.player import Player
 
@@ -34,7 +32,8 @@ class Collectible:
         Returns:
             Distance in world units
         """
-        return distance_to_player(self.x, self.y, player)
+        # Use math.hypot - it's optimized in C and handles edge cases
+        return math.hypot(player.x - self.x, player.y - self.y)
     
     def get_distance_squared_to_player(self, player: 'Player') -> float:
         """Calculate squared distance from collectible to player (faster, no sqrt).
@@ -45,7 +44,9 @@ class Collectible:
         Returns:
             Squared distance in world units
         """
-        return distance_squared_to_player(self.x, self.y, player)
+        dx = player.x - self.x
+        dy = player.y - self.y
+        return dx * dx + dy * dy
     
     
     def check_collection(self, player: 'Player', collection_distance: float) -> bool:
@@ -62,7 +63,12 @@ class Collectible:
             return False
         
         # Use squared distance to avoid expensive sqrt
-        if self.get_distance_squared_to_player(player) < collection_distance ** 2:
+        # Inline calculation to avoid function call overhead
+        dx = player.x - self.x
+        dy = player.y - self.y
+        dist_squared = dx * dx + dy * dy
+        
+        if dist_squared < collection_distance * collection_distance:
             self.collected = True
             return True
         return False

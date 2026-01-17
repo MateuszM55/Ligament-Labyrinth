@@ -4,7 +4,6 @@ import math
 from typing import TYPE_CHECKING
 
 from settings import settings
-from world.entity_utils import distance_to_player, distance_squared_to_player
 
 if TYPE_CHECKING:
     from world.player import Player
@@ -35,7 +34,8 @@ class Monster:
         Returns:
             Distance in world units
         """
-        return distance_to_player(self.x, self.y, player)
+        # Use math.hypot - it's optimized in C and handles edge cases
+        return math.hypot(player.x - self.x, player.y - self.y)
     
     def get_distance_squared_to_player(self, player: 'Player') -> float:
         """Calculate squared distance from monster to player (faster, no sqrt).
@@ -46,7 +46,9 @@ class Monster:
         Returns:
             Squared distance in world units
         """
-        return distance_squared_to_player(self.x, self.y, player)
+        dx = player.x - self.x
+        dy = player.y - self.y
+        return dx * dx + dy * dy
     
     
     def move_towards_player(self, player: 'Player', dt: float) -> None:
@@ -58,7 +60,8 @@ class Monster:
         """
         dx = player.x - self.x
         dy = player.y - self.y
-        distance = math.sqrt(dx * dx + dy * dy)
+        # Use math.hypot for accurate distance calculation
+        distance = math.hypot(dx, dy)
         
         if distance > 0:
             # Normalize direction and apply speed

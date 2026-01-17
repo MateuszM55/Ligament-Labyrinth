@@ -1,6 +1,6 @@
 """Configuration and constants for Ligament Labyrinth raycasting engine."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple
 
 
@@ -69,21 +69,14 @@ class MapSettings:
 
 @dataclass(frozen=True)
 class AssetSettings:
-    """Asset loading configuration."""
     texture_directory: str = "textures"
     texture_size: int = 512
+    default_texture_colors: dict = field(default_factory=lambda: {
+        1: ((150, 150, 150), (100, 100, 100)),
+        2: ((150, 100, 100), (100, 50, 50)),
+        3: ((100, 150, 100), (50, 100, 50))
+    })
     
-    default_texture_colors: dict = None
-    
-    def __post_init__(self):
-        if self.default_texture_colors is None:
-            object.__setattr__(self, 'default_texture_colors', {
-                1: ((150, 150, 150), (100, 100, 100)),
-                2: ((150, 100, 100), (100, 50, 50)),
-                3: ((100, 150, 100), (50, 100, 50))
-            })
-
-
 @dataclass(frozen=True)
 class ColorPalette:
     """Color constants used throughout the game."""

@@ -26,7 +26,6 @@ class ColorPalette:
     minimap_wall_type3: Tuple[int, int, int] = (50, 100, 50)
     minimap_player: Tuple[int, int, int] = (255, 0, 0)
 
-# Create a global instance early so defaults can use it
 palette = ColorPalette()
 
 
@@ -96,7 +95,6 @@ class AssetSettings:
     texture_directory: str = "textures"
     texture_size: int = 512
     
-    # 2. USE THE PALETTE INSTANCE HERE
     default_texture_colors: Dict[int, Tuple] = field(default_factory=lambda: {
         1: palette.wall_gray,
         2: palette.wall_red,

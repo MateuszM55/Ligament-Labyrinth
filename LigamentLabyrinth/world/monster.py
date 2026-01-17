@@ -4,12 +4,13 @@ import math
 from typing import TYPE_CHECKING
 
 from settings import settings
+from world.entity import Entity
 
 if TYPE_CHECKING:
     from world.player import Player
 
 
-class Monster:
+class Monster(Entity):
     """Represents a monster/enemy sprite that chases the player."""
     
     def __init__(self, x: float, y: float, texture_id: int = 0) -> None:
@@ -20,35 +21,8 @@ class Monster:
             y: Y position in world coordinates
             texture_id: Texture ID for the sprite
         """
-        self.x: float = float(x)
-        self.y: float = float(y)
-        self.texture_id: int = texture_id
+        super().__init__(x, y, texture_id)
         self.speed_multiplier: float = 1.0
-    
-    def get_distance_to_player(self, player: 'Player') -> float:
-        """Calculate distance from monster to player.
-        
-        Args:
-            player: Player object
-            
-        Returns:
-            Distance in world units
-        """
-        # Use math.hypot - it's optimized in C and handles edge cases
-        return math.hypot(player.x - self.x, player.y - self.y)
-    
-    def get_distance_squared_to_player(self, player: 'Player') -> float:
-        """Calculate squared distance from monster to player (faster, no sqrt).
-        
-        Args:
-            player: Player object
-            
-        Returns:
-            Squared distance in world units
-        """
-        dx = player.x - self.x
-        dy = player.y - self.y
-        return dx * dx + dy * dy
     
     
     def move_towards_player(self, player: 'Player', dt: float) -> None:

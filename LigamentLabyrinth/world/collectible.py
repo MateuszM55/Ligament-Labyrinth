@@ -3,11 +3,13 @@
 import math
 from typing import TYPE_CHECKING
 
+from world.entity import Entity
+
 if TYPE_CHECKING:
     from world.player import Player
 
 
-class Collectible:
+class Collectible(Entity):
     """Represents a collectible item in the game world."""
     
     def __init__(self, x: float, y: float, texture_id: int = 11) -> None:
@@ -18,35 +20,8 @@ class Collectible:
             y: Y position in world coordinates
             texture_id: Texture ID for the sprite
         """
-        self.x: float = float(x)
-        self.y: float = float(y)
-        self.texture_id: int = texture_id
+        super().__init__(x, y, texture_id)
         self.collected: bool = False
-    
-    def get_distance_to_player(self, player: 'Player') -> float:
-        """Calculate distance from collectible to player.
-        
-        Args:
-            player: Player object
-            
-        Returns:
-            Distance in world units
-        """
-        # Use math.hypot - it's optimized in C and handles edge cases
-        return math.hypot(player.x - self.x, player.y - self.y)
-    
-    def get_distance_squared_to_player(self, player: 'Player') -> float:
-        """Calculate squared distance from collectible to player (faster, no sqrt).
-        
-        Args:
-            player: Player object
-            
-        Returns:
-            Squared distance in world units
-        """
-        dx = player.x - self.x
-        dy = player.y - self.y
-        return dx * dx + dy * dy
     
     
     def check_collection(self, player: 'Player', collection_distance: float) -> bool:
@@ -62,11 +37,7 @@ class Collectible:
         if self.collected:
             return False
         
-        # Use squared distance to avoid expensive sqrt
-        # Inline calculation to avoid function call overhead
-        dx = player.x - self.x
-        dy = player.y - self.y
-        dist_squared = dx * dx + dy * dy
+        dist_squared = self.get_distance_squared_to_player(player)
         
         if dist_squared < collection_distance * collection_distance:
             self.collected = True

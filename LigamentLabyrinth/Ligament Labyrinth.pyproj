@@ -30,6 +30,7 @@
     <Compile Include="engine\raycaster.py" />
     <Compile Include="engine\__init__.py" />
     <Compile Include="world\collectible.py" />
+    <Compile Include="world\entity.py" />
     <Compile Include="world\map.py" />
     <Compile Include="world\monster.py" />
     <Compile Include="world\player.py" />

@@ -1,3 +1,14 @@
+
+import os
+import sys
+
+# Support for PyInstaller and Numba
+if getattr(sys, 'frozen', False):
+    # Set Numba cache to a user folder so it can write its compiled code
+    os.environ['NUMBA_CACHE_DIR'] = os.path.join(os.path.expanduser('~'), '.numba_cache')
+    # Change directory to the EXE location so it finds mapData and assets
+    os.chdir(sys._MEIPASS)
+
 """Ligament Labyrinth - A raycasting horror game engine."""
 
 import sys

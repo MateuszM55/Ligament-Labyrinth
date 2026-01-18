@@ -44,13 +44,13 @@ The project follows Python best practices with clear module separation:
 - docs/ - Project documentation
 - tests/ - Unit and integration tests
 
-## Development
+## Running Build
+python build.py
 
 ### Running Tests
-python -m pytest tests/ -v
-
-### Documentation
-See the docs/ folder for architecture and API reference.
+python -m pytest tests/ -v 
+or
+python run_tests.py
 
 ## Technical Details
 

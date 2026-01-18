@@ -1,6 +1,6 @@
 """Base entity class for objects in the game world."""
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from world.player import Player
@@ -20,6 +20,7 @@ class Entity:
         self.x: float = float(x)
         self.y: float = float(y)
         self.texture_id: int = int(texture_id)
+        self.active: bool = True
     
     def get_distance_to_player(self, player: 'Player') -> float:
         """Calculate the Euclidean distance to the player.
@@ -44,3 +45,21 @@ class Entity:
         dx = player.x - self.x
         dy = player.y - self.y
         return dx * dx + dy * dy
+    
+    def update(self, dt: float, player: 'Player') -> None:
+        """Update the entity's state. Override in subclasses.
+        
+        Args:
+            dt: Delta time in seconds.
+            player: The player instance.
+        """
+        pass
+    
+    @property
+    def render_data(self) -> Tuple[float, float, int]:
+        """Get the data needed for rendering this entity.
+        
+        Returns:
+            Tuple of (x, y, texture_id) for use in sprite rendering.
+        """
+        return (self.x, self.y, self.texture_id)

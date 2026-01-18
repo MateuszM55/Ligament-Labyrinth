@@ -152,11 +152,10 @@ class Game:
             
             self.audio_manager.update_footsteps(dt, self.player.is_moving, self.player.is_sprinting)
             
-            self.entity_manager.update(dt, self.player)
+            collected = self.entity_manager.update(dt, self.player)
             
             self.audio_manager.update_all_monster_sounds(self.entity_manager.monsters, self.player)
             
-            collected = self.entity_manager.check_collections(self.player)
             if collected > 0:
                 self.collectibles_obtained += collected
                 
@@ -168,7 +167,7 @@ class Game:
             # Calculate glitch effect based on how close the monster is
             self.current_glitch_intensity = Raycaster.calculate_glitch_intensity(self.entity_manager, self.player)
             
-            # End game if any monster touches the player
+            # End game if any monster collided with the player
             if self.entity_manager.check_collisions(self.player):
                 self.running = False
             

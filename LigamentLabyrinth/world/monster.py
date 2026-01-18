@@ -23,7 +23,21 @@ class Monster(Entity):
         """
         super().__init__(x, y, texture_id)
         self.speed_multiplier: float = 1.0
+        self.triggered_game_over: bool = False
     
+    def update(self, dt: float, player: 'Player') -> None:
+        """Update monster behavior: move towards player and check collision.
+        
+        Args:
+            dt: Delta time in seconds.
+            player: The player instance.
+        """
+        self.move_towards_player(player, dt)
+        
+        # Check collision with player
+        collision_distance_sq = settings.monster.collision_distance ** 2
+        if self.get_distance_squared_to_player(player) < collision_distance_sq:
+            self.triggered_game_over = True
     
     def move_towards_player(self, player: 'Player', dt: float) -> None:
         """Move the monster towards the player (ignores walls).
@@ -34,7 +48,7 @@ class Monster(Entity):
         """
         dx = player.x - self.x
         dy = player.y - self.y
-        # Use math.hypot for accurate distance calculation
+        
         distance = math.hypot(dx, dy)
         
         if distance > 0:

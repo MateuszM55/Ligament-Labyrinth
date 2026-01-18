@@ -12,6 +12,7 @@ DATA_FILES = [
     ('sounds', 'sounds'),
     ('textures', 'textures'),
     ('mapData', 'mapData'),
+    ('config.json', '.'),
 ]
 
 def build():
@@ -34,8 +35,20 @@ def build():
         else:
             print(f"Warning: Could not find folder '{src}', skipping...")
 
+    print("Building Executable...")
     PyInstaller.__main__.run(args)
-    print(f"\nBuild complete! dist/{APP_NAME}")
+
+    print("Performing Post-Build Copy...")    
+    src_config = 'config.json'
+    dest_config = os.path.join('dist', APP_NAME, 'config.json')
+    
+    if os.path.exists(src_config):
+        shutil.copy(src_config, dest_config)
+        print(f" [OK] Copied {src_config} -> {dest_config}")
+    else:
+        print(f" [WARN] {src_config} not found! User will start with defaults.")
+
+    print(f"\nBuild complete! Your game is ready in: dist/{APP_NAME}")
 
 if __name__ == "__main__":
     build()

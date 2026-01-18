@@ -53,7 +53,6 @@ class RenderSettings:
     wall_ray_resolution_divisor: int = 1
     floor_ceiling_ray_resolution_divisor: int = 1
     wall_height_factor: float = 1.0
-    sprite_scale: float = 1.0
     glitch_intensity: float = 0.0
     
     glitch_enable_monster_proximity: bool = True

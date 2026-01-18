@@ -160,7 +160,7 @@ class Game:
             if collected > 0:
                 self.collectibles_obtained += collected
                 
-                if self.collectibles_obtained >= settings.collectible.total_count:
+                if self.collectibles_obtained >= settings.collectible.count_to_win:
                     self.all_collectibles_obtained = True
                     for monster in self.entity_manager.monsters:
                         monster.speed_multiplier = settings.monster.speed_boost_multiplier

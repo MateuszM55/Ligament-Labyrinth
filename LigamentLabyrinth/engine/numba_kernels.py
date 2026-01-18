@@ -604,7 +604,7 @@ def render_walls_numba(
         types.float64,             # light_intensity
         types.float64,             # ambient_light
         types.float32[:],          # depth_buffer
-        types.UniTuple(types.int64, 3)  # collectible_texture_ids
+        types.UniTuple(types.int64, 4)  # collectible_texture_ids
     ),
     fastmath=True,
     cache=True

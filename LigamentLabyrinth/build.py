@@ -4,24 +4,17 @@ import PyInstaller.__main__
 import os
 import shutil
 
-# Project Name
 APP_NAME = "LigamentLabyrinth"
 ENTRY_POINT = "main.py"
 
-# --- UPDATED DATA FILES ---
-# We map your actual folders to the names the code expects.
-# (Source Folder on Disk, Destination Folder in EXE)
 DATA_FILES = [
     ('music', 'music'),
     ('sounds', 'sounds'),
     ('textures', 'textures'),
-    ('map.txt', 'mapData'),          # Moves map.txt into a 'mapData' folder
-    ('map_ceiling.txt', 'mapData'),  # Moves ceiling into 'mapData'
-    ('map_floor.txt', 'mapData'),    # Moves floor into 'mapData'
+    ('mapData', 'mapData'),
 ]
 
 def build():
-    # Clean up previous attempts
     if os.path.exists("build"): shutil.rmtree("build")
     if os.path.exists("dist"): shutil.rmtree("dist")
 
@@ -35,10 +28,11 @@ def build():
     ]
 
     for src, dest in DATA_FILES:
+        # Check if the SOURCE folder exists before trying to add it
         if os.path.exists(src):
             args.append(f'--add-data={src};{dest}')
         else:
-            print(f"Warning: Could not find {src}, skipping...")
+            print(f"Warning: Could not find folder '{src}', skipping...")
 
     PyInstaller.__main__.run(args)
     print(f"\nBuild complete! dist/{APP_NAME}")

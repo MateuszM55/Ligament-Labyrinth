@@ -119,7 +119,7 @@ class CollectibleSettings:
     """Collectible item configuration."""
     count_to_win: int = 4
     collection_distance: float = 0.5
-    texture_ids: tuple = (15,15,15)
+    texture_ids: tuple = (15,)
 
 @dataclass(frozen=True)
 class MapSettings:

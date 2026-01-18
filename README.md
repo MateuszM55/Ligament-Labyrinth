@@ -47,6 +47,9 @@ The project follows Python best practices with clear module separation:
 ## Running Build
 python build.py
 
+## Configure setttings
+try playing around with settings.py or config.json
+
 ### Running Tests
 python -m pytest tests/ -v 
 or

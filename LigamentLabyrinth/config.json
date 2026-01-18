@@ -32,6 +32,6 @@
     "enable_vignette": true
   },
   "minimap": {
-    "enabled": false
+    "enabled": true
   }
 }

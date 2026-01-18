@@ -15,10 +15,9 @@ DATA_FILES = [
     ('music', 'music'),
     ('sounds', 'sounds'),
     ('textures', 'textures'),
-    # Add your map files individually since they are in the root
-    ('map.txt', '.'),
-    ('map_ceiling.txt', '.'),
-    ('map_floor.txt', '.'),
+    ('map.txt', 'mapData'),          # Moves map.txt into a 'mapData' folder
+    ('map_ceiling.txt', 'mapData'),  # Moves ceiling into 'mapData'
+    ('map_floor.txt', 'mapData'),    # Moves floor into 'mapData'
 ]
 
 def build():

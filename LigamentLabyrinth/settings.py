@@ -93,7 +93,7 @@ class CollectibleSettings:
 @dataclass(frozen=True)
 class MapSettings:
     """Map and tile configuration."""
-    default_map_file: str = "map.txt"
+    default_map_file: str = "mapData/map.txt"
 
 
 @dataclass(frozen=True)

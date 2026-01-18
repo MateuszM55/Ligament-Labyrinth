@@ -1,0 +1,21 @@
+var NAVTREEINDEX1 =
+{
+"namespacesettings.html#a2b05ee821b098a08af02988cb210fa95":[1,0,2,12],
+"namespacesettings.html#a9a2f66fc131af57a47f8f01561ed8947":[1,0,2,13],
+"namespacetests.html":[1,0,3],
+"namespacetests_1_1test__audio__manager.html":[1,0,3,0],
+"namespacetests_1_1test__map.html":[1,0,3,1],
+"namespacetests_1_1test__player.html":[1,0,3,2],
+"namespacetests_1_1test__settings.html":[1,0,3,3],
+"namespacetests_1_1test__smoke.html":[1,0,3,4],
+"namespaceworld.html":[1,0,4],
+"namespaceworld_1_1collectible.html":[1,0,4,0],
+"namespaceworld_1_1entity.html":[1,0,4,1],
+"namespaceworld_1_1entity__manager.html":[1,0,4,2],
+"namespaceworld_1_1entity__utils.html":[1,0,4,3],
+"namespaceworld_1_1entity__utils.html#a4f7314f987af49501ba89deba2706900":[1,0,4,3,0],
+"namespaceworld_1_1map.html":[1,0,4,4],
+"namespaceworld_1_1monster.html":[1,0,4,5],
+"namespaceworld_1_1player.html":[1,0,4,6],
+"pages.html":[]
+};

@@ -53,6 +53,7 @@ class Game:
         
         pygame.event.set_grab(True)
         pygame.mouse.set_visible(False)
+        pygame.mouse.get_rel()
         
         # Load the raw data
         self.game_map, m_data, c_data = Map.load_from_file(settings.map.default_map_file)

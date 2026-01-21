@@ -11,6 +11,7 @@
     <OutputPath>.</OutputPath>
     <Name>Ligament Labyrinth</Name>
     <RootNamespace>PyDoom</RootNamespace>
+    <InterpreterId>MSBuild|env|$(MSBuildProjectFullPath)</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -20,7 +21,6 @@
     <DebugSymbols>true</DebugSymbols>
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
-  
   <ItemGroup>
     <Compile Include="build.py" />
     <Compile Include="main.py" />
@@ -39,13 +39,11 @@
     <Compile Include="world\player.py" />
     <Compile Include="world\__init__.py" />
   </ItemGroup>
-  
   <ItemGroup>
     <Folder Include="engine\" />
     <Folder Include="world\" />
     <Folder Include="mapData\" />
   </ItemGroup>
-  
   <ItemGroup>
     <Content Include="requirements.txt" />
     <Content Include="mapData\map.txt" />
@@ -53,7 +51,17 @@
     <Content Include="mapData\map_ceiling.txt" />
     <Content Include="config.json" />
   </ItemGroup>
-  
+  <ItemGroup>
+    <Interpreter Include="env\">
+      <Id>env</Id>
+      <Version>3.13</Version>
+      <Description>env (Python 3.13 (64-bit))</Description>
+      <InterpreterPath>Scripts\python.exe</InterpreterPath>
+      <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
+      <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
+      <Architecture>X64</Architecture>
+    </Interpreter>
+  </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <Target Name="BeforeBuild">
   </Target>

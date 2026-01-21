@@ -1,7 +1,7 @@
 """Player entity with movement, collision, and view bobbing."""
 
 import math
-from typing import List, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from settings import settings
 
@@ -30,7 +30,7 @@ class Player:
         self.is_sprinting: bool = False
         
         radius = settings.player.collision_radius
-        self.collision_offsets: List[Tuple[float, float]] = [
+        self.collision_offsets: list[tuple[float, float]] = [
             (radius, 0),
             (-radius, 0),
             (0, radius),

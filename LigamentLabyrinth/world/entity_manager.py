@@ -1,7 +1,7 @@
 """Manages dynamic objects (Monsters, Collectibles)."""
 import numpy as np
 import random
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from settings import settings
 from world.monster import Monster
 from world.collectible import Collectible
@@ -15,7 +15,7 @@ class EntityManager:
     
     def __init__(self):
         """Initialize the entity manager with an empty entity list."""
-        self.entities: List[Entity] = []
+        self.entities: list[Entity] = []
         # Pre-allocate numpy array for rendering
         self.sprite_data: np.ndarray = np.empty((0, 3), dtype=np.float32)
 
@@ -27,7 +27,7 @@ class EntityManager:
         """
         self.entities.append(entity)
 
-    def load_entities(self, monster_data: List[dict], collectible_data: List[dict]):
+    def load_entities(self, monster_data: list[dict], collectible_data: list[dict]):
         """Populate the manager with entities from map data.
         
         Args:
@@ -121,7 +121,7 @@ class EntityManager:
         return min(m.get_distance_to_player(player) for m in monsters)
     
     @property
-    def monsters(self) -> List[Monster]:
+    def monsters(self) -> list[Monster]:
         """Get all active monsters. 
         
         Returns:
@@ -130,7 +130,7 @@ class EntityManager:
         return [e for e in self.entities if isinstance(e, Monster)]
     
     @property
-    def collectibles(self) -> List[Collectible]:
+    def collectibles(self) -> list[Collectible]:
         """Get all active collectibles.
         
         Returns:

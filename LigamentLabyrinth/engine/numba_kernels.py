@@ -38,7 +38,7 @@ def cast_ray_numba(
     map_width: int,
     map_height: int,
     max_depth: float
-) -> tuple:
+) -> tuple[float, int, float, float, int]:
     """
     Casts a SINGLE ray from the player to find the nearest wall.
     

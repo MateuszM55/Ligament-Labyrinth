@@ -1,6 +1,6 @@
 """Base entity class for objects in the game world."""
 import math
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from world.player import Player
@@ -56,7 +56,7 @@ class Entity:
         pass
     
     @property
-    def render_data(self) -> Tuple[float, float, int]:
+    def render_data(self) -> tuple[float, float, int]:
         """Get the data needed for rendering this entity.
         
         Returns:

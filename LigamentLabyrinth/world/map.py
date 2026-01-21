@@ -1,6 +1,5 @@
 """Tile-based map geometry."""
 import sys
-from typing import List, Tuple, Any
 import numpy as np
 
 class Map:
@@ -9,8 +8,8 @@ class Map:
     The map is stored as a 2D grid where values > 0 represent wall types.
     """
     
-    def __init__(self, grid: List[List[int]], player_start: Tuple[float, float], 
-                 floor_grid: List[List[int]] = None, ceiling_grid: List[List[int]] = None) -> None:
+    def __init__(self, grid: list[list[int]], player_start: tuple[float, float], 
+                 floor_grid: list[list[int]] = None, ceiling_grid: list[list[int]] = None) -> None:
         """Initialize the map with grid data and player start position.
 
         Args:
@@ -53,7 +52,7 @@ class Map:
         return self.grid[map_y][map_x] > 0
 
     @staticmethod
-    def load_from_file(filename: str) -> Tuple['Map', List[dict], List[dict]]:
+    def load_from_file(filename: str) -> tuple['Map', list[dict], list[dict]]:
         """Load map data from a text file and associated texture maps.
 
         Args:
@@ -110,7 +109,7 @@ class Map:
             sys.exit(1)
 
     @staticmethod
-    def _load_texture_map(filename: str, w: int, h: int) -> List[List[int]]:
+    def _load_texture_map(filename: str, w: int, h: int) -> list[list[int]]:
         """Helper to load auxiliary texture maps (floor/ceiling).
 
         Args:

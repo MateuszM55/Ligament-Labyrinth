@@ -2,7 +2,6 @@
 
 import os
 import re
-from typing import Dict, Optional, Tuple
 import pygame
 import numpy as np
 
@@ -14,11 +13,11 @@ class AssetManager:
     
     def __init__(self) -> None:
         """Initialize the asset manager and load all textures."""
-        self.textures: Dict[int, pygame.Surface] = {}
-        self.sprite_textures: Dict[int, pygame.Surface] = {}
+        self.textures: dict[int, pygame.Surface] = {}
+        self.sprite_textures: dict[int, pygame.Surface] = {}
         
-        self.floor_textures: Dict[int, np.ndarray] = {}
-        self.ceiling_textures: Dict[int, np.ndarray] = {}
+        self.floor_textures: dict[int, np.ndarray] = {}
+        self.ceiling_textures: dict[int, np.ndarray] = {}
         
         self.tex_width: int = settings.assets.texture_size
         self.tex_height: int = settings.assets.texture_size
@@ -29,8 +28,8 @@ class AssetManager:
     def _generate_checkerboard_texture(
         self,
         size: int,
-        color1: Tuple[int, int, int],
-        color2: Tuple[int, int, int]
+        color1: tuple[int, int, int],
+        color2: tuple[int, int, int]
     ) -> pygame.Surface:
         """Generate a simple checkerboard pattern texture."""
         surface = pygame.Surface((size, size))
@@ -192,7 +191,7 @@ class AssetManager:
     def get_ceiling_arrays(self) -> np.ndarray:
         return self.ceiling_texture_arrays
     
-    def get_sprite_texture(self, sprite_id: int) -> Optional[pygame.Surface]:
+    def get_sprite_texture(self, sprite_id: int) -> pygame.Surface | None:
         return self.sprite_textures.get(sprite_id, self.sprite_textures.get(0))
     
     def _prepare_wall_texture_arrays(self) -> None:
@@ -219,7 +218,7 @@ class AssetManager:
     def _prepare_floor_ceiling_arrays(self) -> None:
         """Prepare floor and ceiling textures as NumPy arrays for numba optimization."""
         # Helper to pack a dictionary of surfaces/arrays into a single 4D array
-        def pack_textures(texture_dict: Dict[int, np.ndarray]) -> np.ndarray:
+        def pack_textures(texture_dict: dict[int, np.ndarray]) -> np.ndarray:
             if not texture_dict:
                 return np.zeros((1, self.tex_width, self.tex_height, 3), dtype=np.uint8)
             

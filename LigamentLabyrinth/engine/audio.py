@@ -2,7 +2,7 @@
 """AI generted code"""
 
 import os
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 import pygame
 
 from settings import settings
@@ -27,11 +27,11 @@ class AudioManager:
         self.sfx_volume: float = settings.audio.sfx_volume
         
         # Sound Assets
-        self.footstep_sounds: List[pygame.mixer.Sound] = []
-        self.monster_sound: Optional[pygame.mixer.Sound] = None
+        self.footstep_sounds: list[pygame.mixer.Sound] = []
+        self.monster_sound: pygame.mixer.Sound | None = None
         
         # State
-        self.monster_channels: Dict[int, pygame.mixer.Channel] = {}
+        self.monster_channels: dict[int, pygame.mixer.Channel] = {}
         self.footstep_timer: float = 0.0
         self.current_footstep_index: int = 0
         
@@ -57,7 +57,7 @@ class AudioManager:
     # Resource Loading Helpers
     # -------------------------------------------------------------------------
 
-    def _find_file_with_ext(self, directory: str, base_name: str) -> Optional[str]:
+    def _find_file_with_ext(self, directory: str, base_name: str) -> str | None:
         """Helper to find a file checking multiple audio extensions."""
         for ext in settings.audio.supported_extensions:
             path = os.path.join(directory, f"{base_name}{ext}")
@@ -236,7 +236,7 @@ class AudioManager:
             volume = self._calculate_volume_from_distance(distance)
             channel.set_volume(volume)
 
-    def update_all_monster_sounds(self, monsters: List['Monster'], player: 'Player') -> None:
+    def update_all_monster_sounds(self, monsters: list['Monster'], player: 'Player') -> None:
         """Update volumes for all monster sounds and cleanup inactive ones."""
         active_ids = set()
 
